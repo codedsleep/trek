@@ -10,6 +10,7 @@ pub mod glob;
 pub mod helpers;
 pub mod history;
 pub mod invocation;
+pub mod keymap;
 pub mod location;
 pub mod naming;
 pub mod open;

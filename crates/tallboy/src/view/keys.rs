@@ -1,24 +1,16 @@
-//! Keys that belong to the folder view rather than the window (PROMPT §8.8).
+//! Keys that need a focused item rather than the window: the context menu
+//! opens at it. Every other key of the file view is in `core::keymap` and
+//! `window::keys`.
 //!
 //! These are bound on the view widget itself, in the bubble phase, so they
-//! only fire while the view has keyboard focus. A text entry anywhere else in
-//! the window — the location bar, the type-ahead box, a dialog — never sees
-//! Backspace or Delete turned into a file command.
+//! only fire while the view has keyboard focus.
 
 use gtk::prelude::*;
 
 /// (key, action) pairs activated on the focused folder view.
 const KEYS: &[(&str, &str)] = &[
-    ("BackSpace", "win.up"),
-    ("Delete", "win.trash"),
-    ("KP_Delete", "win.trash"),
-    ("<Shift>Delete", "win.delete"),
-    ("<Shift>KP_Delete", "win.delete"),
-    ("Escape", "win.unselect-all"),
     ("Menu", "win.context-menu"),
     ("<Shift>F10", "win.context-menu"),
-    ("<Control>Return", "win.open-new-tab"),
-    ("<Control>KP_Enter", "win.open-new-tab"),
 ];
 
 /// Attaches the view-local shortcuts to `view`.

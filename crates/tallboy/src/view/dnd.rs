@@ -60,6 +60,19 @@ pub struct Hooks {
     pub menu: Rc<dyn Fn(gtk::Widget, f64, f64)>,
     /// Thumbnails for the cells, when `show_thumbnail` is on.
     pub thumbs: Option<super::thumbs::Loader>,
+    /// The pointer pressed the item at this position: the cursor goes there.
+    pub pressed: Rc<dyn Fn(u32, Pressed)>,
+}
+
+/// What a press did to the selection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pressed {
+    /// The item became the whole selection, as a plain click does.
+    Selected,
+    /// Ctrl or Shift changed the selection deliberately.
+    Modified,
+    /// The selection was left alone.
+    Kept,
 }
 
 thread_local! {
@@ -298,13 +311,14 @@ struct Press {
     open: Cell<bool>,
 }
 
-fn click_gesture<C: CellHandle>(cell: &C, style: Style) -> gtk::GestureClick {
+fn click_gesture<C: CellHandle>(cell: &C, style: Style, hooks: &Hooks) -> gtk::GestureClick {
     let click = gtk::GestureClick::new();
     click.set_button(gdk::BUTTON_PRIMARY);
     let press = Rc::new(Press::default());
 
     let weak_cell = cell.downgrade();
     let pending = press.clone();
+    let (on_press, on_release) = (hooks.pressed.clone(), hooks.pressed.clone());
     click.connect_pressed(move |gesture, n_press, _, _| {
         let (Some(cell), Some(widget)) = (weak_cell.upgrade(), gesture.widget()) else {
             return;
@@ -323,10 +337,13 @@ fn click_gesture<C: CellHandle>(cell: &C, style: Style) -> gtk::GestureClick {
             activate(&widget, position);
         } else if modify || extend {
             select(&widget, position, modify, extend);
+            on_press(position, Pressed::Modified);
         } else if cell.cell_selected() {
             pending.narrow.set(true);
+            on_press(position, Pressed::Kept);
         } else {
             select(&widget, position, false, false);
+            on_press(position, Pressed::Selected);
         }
     });
 
@@ -339,6 +356,7 @@ fn click_gesture<C: CellHandle>(cell: &C, style: Style) -> gtk::GestureClick {
         let position = cell.cell_position();
         if narrow {
             select(&widget, position, false, false);
+            on_release(position, Pressed::Selected);
         }
         if open {
             activate(&widget, position);
@@ -370,14 +388,19 @@ fn secondary_click<C: CellHandle>(cell: &C, hooks: &Hooks) -> gtk::GestureClick 
     click.set_button(gdk::BUTTON_SECONDARY);
     let weak_cell = cell.downgrade();
     let menu = hooks.menu.clone();
+    let pressed = hooks.pressed.clone();
     click.connect_pressed(move |gesture, _, x, y| {
         let (Some(cell), Some(widget)) = (weak_cell.upgrade(), gesture.widget()) else {
             return;
         };
         gesture.set_state(gtk::EventSequenceState::Claimed);
         focus_row(&widget);
-        if !cell.cell_selected() {
-            select(&widget, cell.cell_position(), false, false);
+        let position = cell.cell_position();
+        if cell.cell_selected() {
+            pressed(position, Pressed::Kept);
+        } else {
+            select(&widget, position, false, false);
+            pressed(position, Pressed::Selected);
         }
         menu(widget, x, y);
     });
@@ -508,7 +531,7 @@ pub fn attach<C: CellHandle>(
         },
         hooks,
     ));
-    let click = click_gesture(cell, style);
+    let click = click_gesture(cell, style, hooks);
     let source = drag_source(cell, selection, icon);
     // One group: the click's claim must not cancel the drag source.
     source.group_with(&click);

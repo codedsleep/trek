@@ -7,12 +7,14 @@ use std::{
     cell::{Cell, RefCell},
     rc::Rc,
 };
-use tallboy_core::{glob, sort::SortSpec};
+use tallboy_core::{glob, keymap, sort::SortSpec};
 use tallboy_fs::meta::{self, FileMeta};
 
 struct State {
     show_hidden: Cell<bool>,
     glob: RefCell<Option<String>>,
+    /// The `f` filter: a smart-case substring every item must contain.
+    needle: RefCell<Option<String>>,
     sort: RefCell<SortSpec>,
 }
 
@@ -38,6 +40,7 @@ impl FolderModel {
         let state = Rc::new(State {
             show_hidden: Cell::new(show_hidden),
             glob: RefCell::new(None),
+            needle: RefCell::new(None),
             sort: RefCell::new(sort),
         });
         let store = gio::ListStore::new::<FileItem>();
@@ -49,6 +52,11 @@ impl FolderModel {
                 };
                 let meta = item.meta();
                 if meta.hidden && !state.show_hidden.get() {
+                    return false;
+                }
+                if let Some(needle) = state.needle.borrow().as_deref()
+                    && !keymap::smart_matches(&meta.display_name, needle)
+                {
                     return false;
                 }
                 match state.glob.borrow().as_deref() {
@@ -204,6 +212,20 @@ impl FolderModel {
         self.state.glob.borrow().clone()
     }
 
+    /// Sets or clears the `f` filter. Unlike the glob it also hides folders.
+    pub fn set_needle(&self, needle: Option<String>) {
+        let needle = needle.filter(|n| !n.is_empty());
+        if *self.state.needle.borrow() != needle {
+            self.state.needle.replace(needle);
+            self.filter.changed(gtk::FilterChange::Different);
+        }
+    }
+
+    /// The active `f` filter.
+    pub fn needle(&self) -> Option<String> {
+        self.state.needle.borrow().clone()
+    }
+
     /// Changes the sort order.
     pub fn set_sort(&self, sort: SortSpec) {
         if *self.state.sort.borrow() != sort {
@@ -247,9 +269,25 @@ impl FolderModel {
         self.position_of_item(&item)
     }
 
-    fn position_of_item(&self, item: &FileItem) -> Option<u32> {
+    /// View position of an item, if it is shown.
+    pub fn position_of_item(&self, item: &FileItem) -> Option<u32> {
         (0..self.selection.n_items())
             .find(|position| self.selection.item(*position).as_ref() == Some(item.upcast_ref()))
+    }
+
+    /// Names in view order, for the find commands.
+    pub fn names(&self) -> Vec<String> {
+        (0..self.selection.n_items())
+            .filter_map(|position| self.item_at(position))
+            .map(|item| item.meta().display_name.clone())
+            .collect()
+    }
+
+    /// Brings every item's yank mark in line with the yanked set.
+    pub fn refresh_yank(&self) {
+        for item in self.store.iter::<FileItem>().flatten() {
+            item.refresh_yank();
+        }
     }
 
     /// Selected items in view order.

@@ -94,6 +94,7 @@ fn setup(
     cell.append(&image);
     cell.append(&label);
     dnd::attach(&cell, list_item, selection, &image, style, hooks);
+    super::lines::follow_item(list_item, &cell, None);
     list_item.set_child(Some(&cell));
 }
 

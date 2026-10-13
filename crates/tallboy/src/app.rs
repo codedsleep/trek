@@ -41,6 +41,10 @@ struct Inner {
     seen_first_invocation: Cell<bool>,
     smoke: bool,
     exit_code: Cell<u8>,
+    /// The key bindings of the file view.
+    keymap: tallboy_core::keymap::Keymap,
+    /// Accelerators are off while a text entry has the keyboard.
+    accels_suspended: Cell<bool>,
 }
 
 /// Shared application state. Clones are cheap.
@@ -85,9 +89,11 @@ impl App {
             seen_first_invocation: Cell::new(false),
             smoke: std::env::var_os("TALLBOY_SMOKE").is_some_and(|v| v == "1"),
             exit_code: Cell::new(0),
+            keymap: tallboy_core::keymap::Keymap::yazi(),
+            accels_suspended: Cell::new(false),
         }));
         gtk::Window::set_default_icon_name(crate::dialogs::help::ICON);
-        actions::install_accels(gtk_app);
+        actions::install_accels(gtk_app, true);
         gtk_app.set_menubar(Some(&menubar::build(&app.0.bookmarks_menu)));
         app.load_css();
         app.watch_places();
@@ -159,6 +165,19 @@ impl App {
             },
         );
         crate::volumes::startup(self);
+    }
+
+    /// The key bindings of the file view.
+    pub fn keymap(&self) -> &tallboy_core::keymap::Keymap {
+        &self.0.keymap
+    }
+
+    /// Switches the window accelerators off while a text entry has the
+    /// keyboard, and back on afterwards.
+    pub fn suspend_accels(&self, suspended: bool) {
+        if self.0.accels_suspended.replace(suspended) != suspended {
+            actions::install_accels(&self.0.gtk, !suspended);
+        }
     }
 
     /// The bookmark store, when the bookmarks file could be opened.

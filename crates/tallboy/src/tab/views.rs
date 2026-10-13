@@ -5,12 +5,13 @@ use super::{Change, TabPage};
 use crate::{
     debug,
     settings::{self, Key},
-    view::{Style, View, dnd, grid, keys, list},
+    view::{Style, View, dnd, grid, keys, lines, list},
 };
 use gtk::{glib, prelude::*};
 use std::time::Instant;
 use tallboy_core::{
     config::{Columns, ViewMode},
+    keymap::Linemode,
     sort::SortSpec,
 };
 use tallboy_fs::dir_settings::FolderSettings;
@@ -40,6 +41,18 @@ impl TabPage {
             self.rebuild_view_at(place);
             self.grab_focus();
             self.persist();
+        }
+    }
+
+    /// What the line view shows beside each name.
+    pub fn linemode(&self) -> Linemode {
+        self.0.linemode.get()
+    }
+
+    pub fn set_linemode(&self, linemode: Linemode) {
+        if self.0.linemode.replace(linemode) != linemode {
+            self.rebuild_view();
+            self.emit(Change::Status);
         }
     }
 
@@ -187,7 +200,7 @@ impl TabPage {
             icon_size: match mode {
                 ViewMode::Icon => settings.big_icon_size(),
                 ViewMode::Thumbnail => settings.thumbnail_size(),
-                ViewMode::Compact | ViewMode::List => settings.small_icon_size(),
+                ViewMode::Compact | ViewMode::List | ViewMode::Lines => settings.small_icon_size(),
             },
             full_names: settings.show_full_names(),
             shadow_hidden: settings.shadow_hidden(),
@@ -207,15 +220,15 @@ impl TabPage {
     }
 
     /// Where the view is, so that a rebuilt view can go back there: the
-    /// first selected item, or else how far down the view is scrolled.
+    /// cursor once the user has moved it, or else how far down the view is
+    /// scrolled.
     fn place(&self) -> Option<Place> {
         self.0.view.borrow().as_ref()?;
         if self.0.model.visible_count() == 0 {
             return None;
         }
-        let selection = self.0.model.selection().selection();
-        if !selection.is_empty() {
-            return Some(Place::Item(selection.minimum()));
+        if let Some(position) = self.cursor().filter(|position| *position > 0) {
+            return Some(Place::Item(position));
         }
         let adjustment = self.scroll_adjustment();
         let range = adjustment.upper() - adjustment.page_size();
@@ -245,6 +258,15 @@ impl TabPage {
             }
         };
         let (view, policy) = match style.mode {
+            ViewMode::Lines => {
+                let lines =
+                    lines::build(&inner.model, style, inner.linemode.get(), self.drop_hooks());
+                lines.connect_activate(move |_, position| activate(position));
+                (
+                    View::Lines(lines),
+                    (gtk::PolicyType::Never, gtk::PolicyType::Automatic),
+                )
+            }
             ViewMode::List => {
                 let weak = self.downgrade();
                 let list = list::ListView::new(
@@ -289,7 +311,6 @@ impl TabPage {
         };
         let widget = view.widget();
         keys::install(&widget);
-        self.watch_type_ahead_keys(&widget);
         inner.scroller.set_policy(policy.0, policy.1);
         inner.scroller.set_child(Some(&widget));
         inner.view.replace(Some(view));

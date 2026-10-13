@@ -8,6 +8,8 @@ use std::{cell::RefCell, rc::Rc};
 pub enum PaneEvent {
     /// Another tab became current.
     Switched,
+    /// The user dragged a tab to another place.
+    Reordered,
     /// The user asked to close this tab (close button or middle-click).
     CloseRequested(TabPage),
 }
@@ -48,6 +50,13 @@ impl Pane {
             let handler = handler.borrow().clone();
             if let Some(handler) = handler {
                 handler(PaneEvent::Switched);
+            }
+        });
+        let handler = pane.handler.clone();
+        pane.notebook.connect_page_reordered(move |_, _, _| {
+            let handler = handler.borrow().clone();
+            if let Some(handler) = handler {
+                handler(PaneEvent::Reordered);
             }
         });
         pane
@@ -125,7 +134,7 @@ impl Pane {
         let page = self.notebook.append_page(tab.widget(), Some(&label));
         self.notebook.set_tab_reorderable(tab.widget(), true);
         self.tabs.borrow_mut().push(tab.clone());
-        self.set_label(&tab);
+        self.renumber();
         self.apply_settings(settings);
         self.notebook.set_current_page(Some(page));
     }
@@ -181,6 +190,7 @@ impl Pane {
         self.tabs
             .borrow_mut()
             .retain(|other| other.widget() != tab.widget());
+        self.renumber();
         self.apply_settings(settings);
         self.tabs.borrow().len()
     }
@@ -210,9 +220,34 @@ impl Pane {
             return;
         };
         if let Some(text) = label.first_child().and_downcast::<gtk::Label>() {
-            text.set_text(&tab.title());
+            // The number is the key that switches to the tab.
+            let number = self
+                .notebook
+                .page_num(tab.widget())
+                .map_or(0, |page| page + 1);
+            text.set_text(&format!("{number}  {}", tab.title()));
         }
         label.set_tooltip_text(Some(&tab.location().display()));
+    }
+
+    /// Numbers every tab again after one was added, closed or moved.
+    pub fn renumber(&self) {
+        for tab in self.tabs.borrow().iter() {
+            self.set_label(tab);
+        }
+    }
+
+    /// `{` and `}`: moves `tab` one place left (`-1`) or right (`+1`).
+    pub fn swap(&self, tab: &TabPage, by: i32) {
+        let count = self.notebook.n_pages() as i32;
+        let Some(at) = self.notebook.page_num(tab.widget()) else {
+            return;
+        };
+        let to = at as i32 + by;
+        if (0..count).contains(&to) {
+            self.notebook.reorder_child(tab.widget(), Some(to as u32));
+            self.renumber();
+        }
     }
 
     /// Applies `always_show_tabs`, `hide_close_btn` and `max_tab_chars`.

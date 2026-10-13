@@ -2,12 +2,15 @@
 
 mod commands;
 mod fileops;
+mod keys;
 mod open;
 mod pane;
 mod pathbar;
 mod places;
+mod prompt;
 mod statusbar;
 mod toolbar;
+mod vim;
 
 use crate::sidepane::SidePane;
 use crate::{
@@ -45,9 +48,18 @@ struct Inner {
     /// Holds the panes side by side.
     split: gtk::Paned,
     status: StatusBar,
+    /// The continuations of a started key sequence.
+    which_key: prompt::WhichKey,
+    /// The one-line input over the folder area.
+    input: prompt::InputLine,
+    /// The yes/no question over the folder area.
+    confirm: prompt::Confirm,
+    /// The keys of a sequence that is not complete yet.
+    pending: RefCell<Vec<tallboy_core::keymap::Key>>,
     /// A text entry has keyboard focus, so clipboard shortcuts belong to it.
     text_focus: Cell<bool>,
     refresh_queued: Cell<bool>,
+    status_queued: Cell<bool>,
     settings_handlers: RefCell<Vec<HandlerId>>,
     clipboard_handler: RefCell<Option<(gtk::gdk::Clipboard, glib::SignalHandlerId)>>,
     /// Move to Trash is taken out of the action map inside trash://, which
@@ -76,7 +88,7 @@ impl MainWindow {
             .application(app.gtk())
             .default_width(settings.win_width() as i32)
             .default_height(settings.win_height() as i32)
-            .show_menubar(true)
+            .show_menubar(settings.show_menubar())
             .build();
         if settings.maximized() {
             window.maximize();
@@ -98,6 +110,7 @@ impl MainWindow {
                 default_action: Rc::new(move || settings_for_drop.drop_default_action()),
                 menu: Rc::new(|_, _, _| {}),
                 thumbs: None,
+                pressed: Rc::new(|_, _| {}),
             };
             SidePane::new(
                 app,
@@ -144,9 +157,23 @@ impl MainWindow {
             }
         });
         toolbar.set_path_bar(path_bar.widget());
+        toolbar
+            .menu_button()
+            .set_menu_model(app.gtk().menubar().as_ref());
+        // The which-key list, the input line and the question float over
+        // the folder area.
+        let which_key = prompt::WhichKey::new();
+        let input = prompt::InputLine::new();
+        let confirm = prompt::Confirm::new();
+        let overlay = gtk::Overlay::new();
+        overlay.set_child(Some(&paned));
+        overlay.add_overlay(which_key.widget());
+        overlay.add_overlay(input.widget());
+        overlay.add_overlay(confirm.widget());
+        overlay.set_vexpand(true);
         let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
         content.append(toolbar.widget());
-        content.append(&paned);
+        content.append(&overlay);
         content.append(status.widget());
         window.set_child(Some(&content));
 
@@ -163,8 +190,13 @@ impl MainWindow {
             active: Cell::new(0),
             split,
             status,
+            which_key,
+            input,
+            confirm,
+            pending: RefCell::default(),
             text_focus: Cell::new(false),
             refresh_queued: Cell::new(false),
+            status_queued: Cell::new(false),
             settings_handlers: RefCell::default(),
             clipboard_handler: RefCell::default(),
             trash_action: RefCell::default(),
@@ -253,8 +285,21 @@ impl MainWindow {
             let Some(this) = weak.upgrade() else { return };
             let editing = gtk::prelude::GtkWindowExt::focus(window)
                 .is_some_and(|w| w.is::<gtk::Text>() || w.is::<gtk::TextView>());
+            // Every key typed into an entry is the entry's.
+            this.0.app.suspend_accels(editing);
+            if editing {
+                this.clear_pending();
+            }
             if this.0.text_focus.replace(editing) != editing {
                 this.refresh_enabled();
+            }
+        });
+        self.watch_keys();
+        // When the input line closes the files have the keyboard again.
+        let weak = self.downgrade();
+        inner.input.connect_closed(move || {
+            if let Some(tab) = weak.upgrade().and_then(|window| window.active_tab()) {
+                tab.grab_focus();
             }
         });
 
@@ -289,6 +334,9 @@ impl MainWindow {
                 Key::AlwaysShowTabs,
                 Key::HideCloseBtn,
                 Key::MaxTabChars,
+                Key::ShowMenubar,
+                Key::MillerParent,
+                Key::MillerPreview,
             ],
             move || {
                 if let Some(window) = weak.upgrade() {
@@ -304,6 +352,10 @@ impl MainWindow {
             .clipboard_handler
             .replace(crate::clipboard::connect_changed(move || {
                 if let Some(window) = weak.upgrade() {
+                    // What is yanked, and so which files are marked.
+                    for tab in window.all_tabs() {
+                        tab.model().refresh_yank();
+                    }
                     window.queue_refresh();
                 }
             }));
@@ -428,8 +480,13 @@ impl MainWindow {
             match event {
                 PaneEvent::Switched => {
                     pane.note_current();
+                    // A question was about the files of the tab it was
+                    // asked in; "yes" must not arrive over another one.
+                    window.0.confirm.answer(false);
+                    window.clear_pending();
                     window.queue_refresh();
                 }
+                PaneEvent::Reordered => pane.renumber(),
                 PaneEvent::CloseRequested(tab) => window.close_tab(&tab),
             }
         });
@@ -633,7 +690,33 @@ impl MainWindow {
         if change == Change::Load && self.0.app.smoke() {
             self.smoke_check(tab);
         }
-        self.queue_refresh();
+        // Likewise when the folder under a question changes.
+        if change == Change::Location {
+            self.0.confirm.answer(false);
+        }
+        match change {
+            // Many of these arrive while a key is held; they only move what
+            // the status line says and what commands apply to.
+            Change::Cursor | Change::Selection => self.queue_status(),
+            Change::Location | Change::Status | Change::Load => self.queue_refresh(),
+        }
+    }
+
+    /// Coalesces status-line updates after cursor and selection changes.
+    fn queue_status(&self) {
+        if self.0.refresh_queued.get() || self.0.status_queued.replace(true) {
+            return;
+        }
+        let weak = self.downgrade();
+        glib::idle_add_local_once(move || {
+            if let Some(window) = weak.upgrade() {
+                window.0.status_queued.set(false);
+                if let Some(tab) = window.active_tab() {
+                    window.0.status.set(&tab.status());
+                }
+                window.refresh_enabled();
+            }
+        });
     }
 
     /// `TALLBOY_SMOKE=1`: leave once the first folder has loaded and been
@@ -702,8 +785,16 @@ impl MainWindow {
                 .map_or_else(|| "tallboy".into(), TabPage::title),
         ));
         inner.toolbar.apply(&settings.toolbar());
+        // Two panes leave no room for three columns each.
+        let single = inner.panes.borrow().len() == 1;
         for pane in inner.panes.borrow().iter() {
             pane.apply_settings(settings);
+            for tab in pane.tabs() {
+                tab.set_columns_shown(
+                    single && settings.miller_parent(),
+                    single && settings.miller_preview(),
+                );
+            }
         }
         inner
             .path_bar
@@ -717,6 +808,7 @@ impl MainWindow {
             let (_, index) = tab.history_labels();
             actions::set_text(window, "history-go", &index.to_string());
         }
+        window.set_show_menubar(settings.show_menubar());
         inner.status.widget().set_visible(settings.show_statusbar());
         if let Some(tab) = &tab {
             inner.status.set(&tab.status());
@@ -738,6 +830,9 @@ impl MainWindow {
         let has = |name: &str| toolbar.iter().any(|t| t == name);
         for (action, on) in [
             ("show-statusbar", settings.show_statusbar()),
+            ("show-menubar", settings.show_menubar()),
+            ("miller-parent", settings.miller_parent()),
+            ("miller-preview", settings.miller_preview()),
             ("sidepane-show", !side.hidden),
             ("dual-pane", inner.panes.borrow().len() == 2),
             ("fullscreen", window.is_fullscreen()),
@@ -799,10 +894,8 @@ impl MainWindow {
             self.0.app.dir_settings().is_some(),
         );
 
-        let selected = tab
-            .as_ref()
-            .map(|tab| tab.model().selected())
-            .unwrap_or_default();
+        // What a command would act on: the selection, or the cursor's file.
+        let selected = tab.as_ref().map(TabPage::targets).unwrap_or_default();
         let every = |test: fn(&tallboy_fs::meta::Access) -> bool| {
             selected.iter().all(|item| test(&item.meta().access))
         };

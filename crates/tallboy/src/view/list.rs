@@ -135,6 +135,7 @@ fn name_factory(
         content.append(&image);
         content.append(&label);
         dnd::attach(&content, cell, &selection, &image, style, &hooks);
+        super::lines::follow_item(cell, &content, None);
         cell.set_child(Some(&content));
     });
     factory.connect_unbind(move |_, object| {

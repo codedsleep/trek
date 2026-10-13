@@ -19,7 +19,7 @@ impl MainWindow {
     /// first selected file, and opens every selected file of that type.
     pub(super) fn open_selection_with(&self) {
         let Some(tab) = self.active_tab() else { return };
-        let selected = tab.model().selected();
+        let selected = tab.targets();
         let Some(first) = selected.iter().find(|item| !item.is_dir()) else {
             return;
         };
@@ -37,8 +37,7 @@ impl MainWindow {
     pub(super) fn open_selection_with_app(&self, desktop_id: &str) {
         let Some(tab) = self.active_tab() else { return };
         let files: Vec<gio::File> = tab
-            .model()
-            .selected()
+            .targets()
             .iter()
             .filter(|item| !item.is_dir())
             .map(|item| gio::File::for_uri(&item.meta().uri))

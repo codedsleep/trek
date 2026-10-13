@@ -12,6 +12,8 @@ pub enum Column {
     Size,
     /// Modification time.
     Modified,
+    /// Creation ("birth") time, where the filesystem records one.
+    Created,
     /// Unix mode.
     Permissions,
     /// Owner.
@@ -53,6 +55,7 @@ impl fmt::Display for SortSpec {
                 Column::Description => "desc",
                 Column::Size => "size",
                 Column::Modified => "mtime",
+                Column::Created => "btime",
                 Column::Permissions => "perm",
                 Column::Owner => "owner",
                 Column::Group => "group",
@@ -77,6 +80,7 @@ impl FromStr for SortSpec {
             Some("desc") => Column::Description,
             Some("size") => Column::Size,
             Some("mtime") => Column::Modified,
+            Some("btime") => Column::Created,
             Some("perm") => Column::Permissions,
             Some("owner") => Column::Owner,
             Some("group") => Column::Group,
@@ -121,6 +125,8 @@ pub struct SortKeys {
     pub size: u64,
     /// Epoch seconds.
     pub modified: i64,
+    /// Creation time in epoch seconds; 0 when unknown.
+    pub created: i64,
     /// Mode bits.
     pub mode: u32,
     /// Owner display.
@@ -206,6 +212,8 @@ pub struct SortFacts<'a> {
     pub size: u64,
     /// Epoch seconds.
     pub modified: i64,
+    /// Creation time in epoch seconds; 0 when unknown.
+    pub created: i64,
     /// Mode bits.
     pub mode: u32,
     /// Owner name.
@@ -222,6 +230,7 @@ impl SortKeys {
             description: &self.description,
             size: self.size,
             modified: self.modified,
+            created: self.created,
             mode: self.mode,
             owner: &self.owner,
             group: &self.group,
@@ -254,6 +263,7 @@ pub fn compare_facts(
         Column::Description => a.description.cmp(b.description),
         Column::Size => a.size.cmp(&b.size),
         Column::Modified => a.modified.cmp(&b.modified),
+        Column::Created => a.created.cmp(&b.created),
         Column::Permissions => a.mode.cmp(&b.mode),
         Column::Owner => a.owner.cmp(b.owner),
         Column::Group => a.group.cmp(b.group),

@@ -102,6 +102,7 @@ fn edit_menu() -> gio::Menu {
 
 fn view_menu() -> gio::Menu {
     let mode = section(&[
+        ("Li_ne View", "win.view-mode::lines"),
         ("_Icon View", "win.view-mode::icon"),
         ("_Compact View", "win.view-mode::compact"),
         ("_Thumbnail View", "win.view-mode::thumbnail"),
@@ -139,7 +140,10 @@ fn view_menu() -> gio::Menu {
     chrome.append_submenu(Some("_Toolbar"), &toolbar);
     chrome.append_submenu(Some("Pat_h Bar"), &pathbar);
     chrome.append_submenu(Some("Side _Pane"), &side);
+    chrome.append(Some("Parent _Column"), Some("win.miller-parent"));
+    chrome.append(Some("Pre_view Column"), Some("win.miller-preview"));
     chrome.append(Some("Show Status B_ar"), Some("win.show-statusbar"));
+    chrome.append(Some("Show _Menu Bar"), Some("win.show-menubar"));
     sections(&[
         &section(&[("_Reload Folder", "win.reload")]),
         &first,
@@ -196,7 +200,7 @@ pub fn build(bookmarks: &gio::Menu) -> gio::Menu {
     ]);
     let help = section(&[
         ("_About", "win.about"),
-        ("_Keyboard Navigation", "win.keyboard-navigation"),
+        ("_Keys", "win.keyboard-navigation"),
     ]);
     let bar = gio::Menu::new();
     bar.append_submenu(Some("_File"), &file_menu());

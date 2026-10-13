@@ -119,21 +119,21 @@ impl MainWindow {
             }
             Cmd::Open => {
                 if let Some(tab) = tab {
-                    tab.open(tab.model().selected());
+                    tab.open(tab.targets());
                 }
             }
             Cmd::Trash => self.trash_selection(),
             Cmd::Delete => self.delete_selection(),
             Cmd::Rename => self.rename_selection(),
-            Cmd::CreateFolder => self.create_new(true),
-            Cmd::CreateFile => self.create_new(false),
+            Cmd::CreateFolder => self.ask_create(Some(true)),
+            Cmd::CreateFile => self.ask_create(Some(false)),
             Cmd::CreateLink => self.transfer_selection_to_chosen_folder(Transfer::Link),
             Cmd::MoveTo => self.transfer_selection_to_chosen_folder(Transfer::Move),
             Cmd::CopyTo => self.transfer_selection_to_chosen_folder(Transfer::Copy),
             Cmd::CopyPath => self.copy_paths(),
             Cmd::Cut => self.copy_selection(true),
             Cmd::Copy => self.copy_selection(false),
-            Cmd::Paste => self.paste(),
+            Cmd::Paste => self.paste(false),
             Cmd::OpenWith => self.open_selection_with(),
             Cmd::OpenWithApp => {
                 if let Value::Text(id) = value {
@@ -162,7 +162,7 @@ impl MainWindow {
                     && folder.is_dir()
                     && let Some(destination) = location_from_uri(&folder.meta().uri)
                 {
-                    self.paste_into(destination);
+                    self.paste_into(destination, false);
                 }
             }
             Cmd::Restore => self.restore_selection(),
@@ -180,7 +180,7 @@ impl MainWindow {
             Cmd::RunCommand => self.run_command(),
             Cmd::OpenNewTab => {
                 if let Some(tab) = tab {
-                    for item in tab.model().selected() {
+                    for item in tab.targets() {
                         if item.is_dir()
                             && let Some(location) = location_from_uri(&item.meta().uri)
                         {
@@ -291,12 +291,30 @@ impl MainWindow {
                 }
             }
             Cmd::FocusNextPane => self.focus_next_pane(),
+            Cmd::ShowMenubar => {
+                if let Value::Bool(show) = value {
+                    settings::set::show_menubar(settings, show);
+                }
+            }
+            Cmd::Menu => inner.toolbar.menu_button().popup(),
+            Cmd::MillerParent => {
+                if let Value::Bool(show) = value {
+                    settings::set::miller_parent(settings, show);
+                }
+            }
+            Cmd::MillerPreview => {
+                if let Value::Bool(show) = value {
+                    settings::set::miller_preview(settings, show);
+                }
+            }
             Cmd::DebugDump => self.debug_dump(),
             Cmd::Preferences => {
                 crate::dialogs::prefs::show(&inner.app, Some(inner.window.upcast_ref()), 1);
             }
             Cmd::About => crate::dialogs::help::about(inner.window.upcast_ref()),
-            Cmd::KeyboardNavigation => crate::dialogs::help::keyboard(inner.window.upcast_ref()),
+            Cmd::KeyboardNavigation => {
+                crate::dialogs::help::keyboard(inner.window.upcast_ref(), inner.app.keymap());
+            }
             // Left out of v1 (SCOPE D4); their menu items are not built.
             Cmd::GoApplications | Cmd::FindFiles => log::info!("{cmd:?}: not in v1"),
         }
@@ -354,7 +372,19 @@ impl MainWindow {
             .map(|window| window.title().unwrap_or_default().to_string())
             .collect();
         eprintln!(
-            "tallboy state: {tab} focus={focus} toplevels={} dialogs={:?} title={:?} {} clipboard={:?} {} panes={} active_pane={} tabs={} {}",
+            "tallboy state: {tab} focus={focus} input={} confirm={} pending={:?} which_key={} notice={:?} yanked={:?} toplevels={} dialogs={:?} title={:?} {} clipboard={:?} {} panes={} active_pane={} tabs={} {}",
+            self.0.input.debug_state(),
+            self.0.confirm.debug_state(),
+            self.0
+                .pending
+                .borrow()
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(" "),
+            self.0.which_key.is_open(),
+            self.0.status.debug_state(),
+            crate::view::item::yanked(),
             shown.len(),
             dialogs,
             self.0.window.title().unwrap_or_default(),
@@ -376,7 +406,7 @@ fn zoom(settings: &crate::settings::Settings, mode: ViewMode, cmd: Cmd) {
     let (current, normal) = match mode {
         ViewMode::Icon => (settings.big_icon_size(), 48),
         ViewMode::Thumbnail => (settings.thumbnail_size(), 128),
-        ViewMode::Compact | ViewMode::List => (settings.small_icon_size(), 24),
+        ViewMode::Compact | ViewMode::List | ViewMode::Lines => (settings.small_icon_size(), 24),
     };
     let size = match cmd {
         Cmd::ZoomIn => helpers::zoom(current, true).min(LARGEST),
@@ -386,7 +416,9 @@ fn zoom(settings: &crate::settings::Settings, mode: ViewMode, cmd: Cmd) {
     match mode {
         ViewMode::Icon => settings::set::big_icon_size(settings, size),
         ViewMode::Thumbnail => settings::set::thumbnail_size(settings, size),
-        ViewMode::Compact | ViewMode::List => settings::set::small_icon_size(settings, size),
+        ViewMode::Compact | ViewMode::List | ViewMode::Lines => {
+            settings::set::small_icon_size(settings, size)
+        }
     }
 }
 

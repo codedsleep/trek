@@ -5,7 +5,9 @@ pub mod grid;
 mod index;
 pub mod item;
 pub mod keys;
+pub mod lines;
 pub mod list;
+pub mod mini;
 pub mod model;
 pub mod thumbs;
 
@@ -33,6 +35,7 @@ pub struct Style {
 pub enum View {
     Grid(gtk::GridView),
     List(list::ListView),
+    Lines(gtk::ListView),
 }
 
 impl View {
@@ -40,6 +43,7 @@ impl View {
         match self {
             Self::Grid(grid) => grid.clone().upcast(),
             Self::List(list) => list.widget().clone().upcast(),
+            Self::Lines(lines) => lines.clone().upcast(),
         }
     }
 
@@ -48,6 +52,7 @@ impl View {
         match self {
             Self::Grid(grid) => grid.scroll_to(position, flags, None),
             Self::List(list) => list.widget().scroll_to(position, None, flags, None),
+            Self::Lines(lines) => lines.scroll_to(position, flags, None),
         }
     }
 

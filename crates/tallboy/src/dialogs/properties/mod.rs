@@ -394,6 +394,7 @@ pub fn show(
                             recursive,
                         },
                         "Changing file attributes",
+                        false,
                         move |summary| {
                             // Both changes name the original URI. Renaming first
                             // races the worker (or its pending recursion question).

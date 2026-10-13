@@ -90,9 +90,30 @@ fn precheck(kind: &JobKind, policy: &Policy) -> Result<(), GuardError> {
 
 type Done = Box<dyn FnOnce(&JobSummary)>;
 
+thread_local! {
+    /// The jobs that have not finished, for the task key (`w`).
+    static RUNNING: RefCell<Vec<std::rc::Weak<Running>>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Brings up the progress window of every job that is still running.
+/// Returns whether there was one.
+pub fn present_running() -> bool {
+    let running: Vec<Rc<Running>> = RUNNING.with_borrow_mut(|jobs| {
+        jobs.retain(|job| job.upgrade().is_some_and(|job| !job.finished.get()));
+        jobs.iter().filter_map(std::rc::Weak::upgrade).collect()
+    });
+    for job in &running {
+        job.show();
+        job.dialog.present();
+    }
+    !running.is_empty()
+}
+
 struct Running {
     app: App,
     parent: Option<gtk::Window>,
+    /// Existing files are replaced without asking (`P`).
+    overwrite: bool,
     handle: JobHandle,
     dialog: ProgressDialog,
     shown: Cell<bool>,
@@ -125,6 +146,12 @@ impl Running {
         };
         let parent = self.question_parent();
         match question {
+            // A forced paste answers for itself wherever replacing is
+            // possible at all; a folder in the way of a file still asks.
+            Question::Conflict {
+                can_overwrite: true,
+                ..
+            } if self.overwrite => answer(Answer::Overwrite { apply_to_all: true }),
             Question::Conflict {
                 src,
                 dest,
@@ -195,6 +222,7 @@ pub fn start(
     parent: Option<&gtk::Window>,
     kind: JobKind,
     title: &str,
+    overwrite: bool,
     done: impl FnOnce(&JobSummary) + 'static,
 ) {
     let policy = Policy::from_environment();
@@ -209,6 +237,7 @@ pub fn start(
     let running = Rc::new(Running {
         app: app.clone(),
         parent: parent.cloned(),
+        overwrite,
         handle: jobs::spawn_with_options(kind, policy, options),
         dialog: ProgressDialog::new(app.gtk(), title),
         shown: Cell::new(false),
@@ -217,6 +246,8 @@ pub fn start(
         total: Cell::new((0, 0)),
         done: RefCell::new(Some(Box::new(done))),
     });
+
+    RUNNING.with_borrow_mut(|jobs| jobs.push(Rc::downgrade(&running)));
 
     let weak = Rc::downgrade(&running);
     running.dialog.pause_button().connect_clicked(move |_| {

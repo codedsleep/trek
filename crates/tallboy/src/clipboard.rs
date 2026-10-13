@@ -29,6 +29,10 @@ pub fn set_files(files: Vec<Location>, cut: bool) {
         .iter()
         .map(|location| gio::File::for_uri(location.to_uri()))
         .collect();
+    crate::view::item::set_yanked(Some(crate::view::item::Yanked {
+        uris: files.iter().map(|file| file.to_uri().to_owned()).collect(),
+        cut,
+    }));
     let payload = Payload {
         intent: if cut { Intent::Move } else { Intent::Copy },
         files,
@@ -53,6 +57,7 @@ pub fn set_files(files: Vec<Location>, cut: bool) {
 /// Copy Path(s): plain text only.
 pub fn set_text(text: &str) {
     if let Some(clipboard) = clipboard() {
+        crate::view::item::set_yanked(None);
         clipboard.set_text(text);
     }
 }
@@ -83,6 +88,7 @@ pub fn offered_mime_types() -> Vec<String> {
 
 /// Empties the clipboard after a cut was pasted, when the cut was ours.
 pub fn clear_own() {
+    crate::view::item::set_yanked(None);
     if let Some(clipboard) = clipboard()
         && clipboard.is_local()
         && let Err(e) = clipboard.set_content(gdk::ContentProvider::NONE)
@@ -162,6 +168,12 @@ pub fn connect_changed(
     changed: impl Fn() + 'static,
 ) -> Option<(gdk::Clipboard, glib::SignalHandlerId)> {
     let clipboard = clipboard()?;
-    let handler = clipboard.connect_changed(move |_| changed());
+    let handler = clipboard.connect_changed(move |clipboard| {
+        // Another program's clipboard replaced what was yanked here.
+        if !clipboard.is_local() {
+            crate::view::item::set_yanked(None);
+        }
+        changed();
+    });
     Some((clipboard, handler))
 }

@@ -1,12 +1,186 @@
-/* Only what the theme cannot know. No colours here: tallboy follows the
- * system GTK 4 theme (DISCOVERY D20). */
+/* Only what the theme cannot know. No colours of its own: every colour is
+ * one of the theme's named colours (DISCOVERY D20). */
 
 .hidden-item {
   opacity: 0.5;
 }
 
 .statusbar {
-  padding: 2px 8px;
+  padding: 3px 8px 3px 6px;
+}
+
+/* The mode, as Yazi shows it at the left of its status line. */
+.mode-pill {
+  padding: 0 8px;
+  border-radius: 3px;
+  font-weight: bold;
+  background: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
+}
+
+.mode-pill.select {
+  background: @success_color;
+}
+
+.mode-pill.unset {
+  background: @error_color;
+}
+
+.status-notice {
+  font-weight: bold;
+}
+
+.status-pending {
+  padding: 0 6px;
+  border-radius: 3px;
+  font-weight: bold;
+  background: alpha(@theme_fg_color, 0.12);
+}
+
+.status-segments,
+.status-right {
+  opacity: 0.75;
+}
+
+/* ---- the line view ---- */
+
+/* The row's own padding goes into the line, so that the cursor's
+ * highlight reaches both edges. */
+.lines-view > row {
+  padding: 0;
+}
+
+.lines-view .line {
+  padding: 0 10px 0 0;
+}
+
+/* The gutter runs the full height of the row; the rest keeps its distance. */
+.lines-view .line > :not(.line-gutter) {
+  margin-top: 3px;
+  margin-bottom: 3px;
+}
+
+.line-gutter {
+  min-width: 3px;
+  margin-right: 3px;
+}
+
+.line-detail {
+  opacity: 0.6;
+}
+
+/* Selected files are tinted and marked in the gutter; the full highlight
+ * is the cursor's, which is the one thing there is always exactly one of. */
+.lines-view > row:selected {
+  background: alpha(@theme_selected_bg_color, 0.22);
+  color: inherit;
+}
+
+.lines-view > row:selected .line-gutter {
+  background: @theme_selected_bg_color;
+}
+
+.lines-view .line#cursor {
+  background: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
+}
+
+.lines-view > row:selected .line#cursor .line-gutter {
+  background: @theme_selected_fg_color;
+}
+
+.lines-view .line#cursor .line-detail {
+  opacity: 0.85;
+}
+
+.line-gutter#yank-copy,
+.lines-view > row:selected .line-gutter#yank-copy {
+  background: @success_color;
+}
+
+.line-gutter#yank-cut,
+.lines-view > row:selected .line-gutter#yank-cut {
+  background: @error_color;
+}
+
+/* In dual-pane mode only the pane that keys act on shows its cursor at
+ * full strength. */
+.panes.dual .pane:not(.active-pane) .lines-view .line#cursor {
+  background: alpha(@theme_fg_color, 0.14);
+  color: inherit;
+}
+
+/* The focus ring would be a second cursor. */
+.lines-view > row:focus-visible {
+  outline: none;
+}
+
+/* The grid views and the detailed list draw the cursor as a frame. */
+.folder-view:not(.lines-view) #cursor {
+  outline: 2px solid @theme_selected_bg_color;
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* The parent and preview columns: quieter than the one the keys act on. */
+.side-column .line#cursor {
+  background: alpha(@theme_fg_color, 0.14);
+  color: inherit;
+}
+
+.side-column {
+  opacity: 0.85;
+}
+
+.miller-parent {
+  border-right: 1px solid alpha(@theme_fg_color, 0.12);
+}
+
+.miller-preview {
+  border-left: 1px solid alpha(@theme_fg_color, 0.12);
+}
+
+.preview-text {
+  padding: 8px 12px;
+  font-family: monospace;
+}
+
+.preview-info {
+  padding: 24px;
+}
+
+/* ---- what floats over the folder area ---- */
+
+.floating {
+  background: @theme_bg_color;
+  border: 1px solid alpha(@theme_fg_color, 0.25);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px alpha(black, 0.3);
+}
+
+.which-key {
+  margin: 0 10px 8px 10px;
+  padding: 10px 14px;
+}
+
+.which-key-key {
+  font-family: monospace;
+  font-weight: bold;
+  color: @theme_selected_bg_color;
+}
+
+.input-line {
+  margin-top: 28px;
+  padding: 12px 14px;
+}
+
+.confirm {
+  padding: 16px 18px;
+}
+
+.help-key {
+  font-family: monospace;
+  font-weight: bold;
 }
 
 .folder-view > child {
@@ -46,10 +220,6 @@
 
 .item-emblem-side {
   margin-left: -12px;
-}
-
-.type-ahead {
-  margin: 8px 20px;
 }
 
 .drag-count {

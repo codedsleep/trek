@@ -115,7 +115,13 @@ impl TabPage {
     /// selected. `at` is a point in `widget`'s coordinates; without one (the
     /// Menu key) the menu opens at the focused item.
     pub fn show_context_menu(&self, at: Option<(gtk::Widget, f64, f64)>) {
-        let selected = self.0.model.selected();
+        // The Menu key asks about what a command would act on; a click has
+        // already selected its file, or cleared the selection for the folder.
+        let selected = if at.is_none() {
+            self.targets()
+        } else {
+            self.0.model.selected()
+        };
         let menu = if selected.is_empty() {
             folder_menu()
         } else {

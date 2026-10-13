@@ -171,6 +171,48 @@ impl Config {
                     warnings,
                 )
             }
+            "show_menubar" => {
+                self.show_menubar = fallback(
+                    match value {
+                        "0" => Some(false),
+                        "1" => Some(true),
+                        _ => None,
+                    },
+                    || Self::default().show_menubar,
+                    "ui",
+                    key,
+                    value,
+                    warnings,
+                )
+            }
+            "miller_parent" => {
+                self.miller_parent = fallback(
+                    match value {
+                        "0" => Some(false),
+                        "1" => Some(true),
+                        _ => None,
+                    },
+                    || Self::default().miller_parent,
+                    "ui",
+                    key,
+                    value,
+                    warnings,
+                )
+            }
+            "miller_preview" => {
+                self.miller_preview = fallback(
+                    match value {
+                        "0" => Some(false),
+                        "1" => Some(true),
+                        _ => None,
+                    },
+                    || Self::default().miller_preview,
+                    "ui",
+                    key,
+                    value,
+                    warnings,
+                )
+            }
             "show_thumbnail" => {
                 self.show_thumbnail = fallback(
                     match value {

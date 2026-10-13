@@ -8,7 +8,7 @@ use std::{
 };
 use tallboy_core::sort::{SortFacts, SortSpec};
 /// Common metadata attributes; content testing is appended according to the preference.
-pub const ATTRIBUTES: &str = "standard::name,standard::display-name,standard::edit-name,standard::type,standard::is-hidden,standard::is-backup,standard::is-symlink,standard::symlink-target,standard::icon,standard::size,standard::allocated-size,standard::target-uri,time::modified,time::access,unix::is-mountpoint,unix::mode,unix::uid,unix::gid,owner::user,owner::group,access::*,id::filesystem,trash::*";
+pub const ATTRIBUTES: &str = "standard::name,standard::display-name,standard::edit-name,standard::type,standard::is-hidden,standard::is-backup,standard::is-symlink,standard::symlink-target,standard::icon,standard::size,standard::allocated-size,standard::target-uri,time::modified,time::access,time::created,unix::is-mountpoint,unix::mode,unix::uid,unix::gid,owner::user,owner::group,access::*,id::filesystem,trash::*";
 /// Content-type query variant without duplicating the attribute list.
 pub fn attributes(defer_content_test: bool) -> String {
     format!(
@@ -127,6 +127,8 @@ pub struct FileMeta {
     pub mtime: i64,
     /// Access seconds.
     pub atime: i64,
+    /// Creation ("birth") seconds; 0 when the filesystem records none.
+    pub btime: i64,
     /// Unix permission bits.
     pub mode: u32,
     /// Unix owner id.
@@ -219,6 +221,7 @@ impl FileMeta {
             allocated_size: info.attribute_uint64("standard::allocated-size"),
             mtime,
             atime: info.attribute_uint64("time::access") as i64,
+            btime: info.attribute_uint64("time::created") as i64,
             mode,
             uid: info.attribute_uint32("unix::uid"),
             gid: info.attribute_uint32("unix::gid"),
@@ -282,6 +285,7 @@ impl FileMeta {
             description: &self.description,
             size: self.size,
             modified: self.mtime,
+            created: self.btime,
             mode: self.mode,
             owner: &self.owner,
             group: &self.group,

@@ -76,6 +76,12 @@ pub struct Config {
     pub pathbar_mode_buttons: bool,
     /// `ui/dual_pane`.
     pub dual_pane: bool,
+    /// `ui/show_menubar`: the menu bar is shown, not only the menu button.
+    pub show_menubar: bool,
+    /// `ui/miller_parent`: the parent folder's column is shown.
+    pub miller_parent: bool,
+    /// `ui/miller_preview`: the preview column is shown.
+    pub miller_preview: bool,
     /// `ui/show_thumbnail`.
     pub show_thumbnail: bool,
     /// `ui/shadow_hidden`.
@@ -172,8 +178,11 @@ impl Default for Config {
             focus_previous: false,
             show_hidden: false,
             show_statusbar: true,
-            pathbar_mode_buttons: false,
+            pathbar_mode_buttons: true,
             dual_pane: false,
+            show_menubar: false,
+            miller_parent: true,
+            miller_preview: true,
             show_thumbnail: true,
             shadow_hidden: false,
             places_home: true,
@@ -200,13 +209,13 @@ impl Default for Config {
             bm_open_method: BookmarkOpen::Current,
             drop_default_action: DropAction::Auto,
             side_pane_mode: SidePane {
-                hidden: false,
+                hidden: true,
                 mode: PaneMode::Places,
             },
-            view_mode: ViewMode::Icon,
+            view_mode: ViewMode::Lines,
             sort: SortSpec::default(),
             columns: Columns::default(),
-            toolbar: Toolbar(vec!["newtab".into(), "navigation".into(), "home".into()]),
+            toolbar: Toolbar(Vec::new()),
             autorun_choices: BTreeMap::new(),
         }
     }

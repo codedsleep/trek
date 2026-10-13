@@ -15,7 +15,7 @@ macro_rules! codec {
 }
 codec!(BookmarkOpen {Current=>"0", Tab=>"1", Window=>"2"});
 codec!(DropAction {Auto=>"auto", Copy=>"copy", Move=>"move", Ask=>"ask"});
-codec!(ViewMode {Icon=>"icon", Compact=>"compact", Thumbnail=>"thumbnail", List=>"list"});
+codec!(ViewMode {Icon=>"icon", Compact=>"compact", Thumbnail=>"thumbnail", List=>"list", Lines=>"lines"});
 codec!(PaneMode {Places=>"places", Tree=>"dirtree"});
 /// Side pane visibility and content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,10 +1,12 @@
 //! One tab: a location, its history, its folder and the view showing it.
 
+mod cursor;
 mod events;
 mod menus;
+mod miller;
 mod nav;
+mod preview;
 mod status;
-mod typeahead;
 mod views;
 
 use crate::{
@@ -27,6 +29,7 @@ use tallboy_core::{
 };
 use tallboy_fs::folder::{Folder, FsInfo};
 
+pub use cursor::Mode;
 pub use status::Status;
 
 /// What changed in a tab; listeners refresh the matching chrome.
@@ -38,6 +41,8 @@ pub enum Change {
     Status,
     /// The selection changed.
     Selection,
+    /// The cursor moved, or visual mode was entered or left.
+    Cursor,
     /// The load state changed.
     Load,
 }
@@ -63,6 +68,15 @@ struct Restore {
 
 struct Inner {
     app: App,
+    /// The notebook page: parent column, files, preview column.
+    page: gtk::Grid,
+    /// The parent folder, to the left of the files.
+    parent: crate::view::mini::MiniColumn,
+    /// What is under the cursor, to their right.
+    preview: preview::Preview,
+    /// Whether the parent and the preview column are shown.
+    columns_shown: Cell<(bool, bool)>,
+    /// The files and what is laid over them.
     root: gtk::Overlay,
     scroller: gtk::ScrolledWindow,
     empty: gtk::Label,
@@ -100,7 +114,11 @@ struct Inner {
     pin_queued: Cell<bool>,
     /// The view should have the keyboard once it has something to focus.
     wants_focus: Cell<bool>,
-    type_ahead: typeahead::TypeAhead,
+    cursor: cursor::Cursor,
+    /// What the line view shows beside each name.
+    linemode: Cell<tallboy_core::keymap::Linemode>,
+    /// A name given with `t r`, shown instead of the folder's.
+    custom_title: RefCell<Option<String>>,
     load_started: Cell<Option<Instant>>,
     stalls: RefCell<Option<debug::StallWatch>>,
 }
@@ -158,15 +176,41 @@ impl TabPage {
         error.append(&error_text);
         error.append(&retry);
         error.set_visible(false);
-        let type_ahead = typeahead::TypeAhead::new();
         let root = gtk::Overlay::new();
         root.set_child(Some(&scroller));
         root.add_overlay(&empty);
         root.add_overlay(&error);
-        root.add_overlay(type_ahead.widget());
+
+        // Yazi's proportions: one part parent, four files, three preview.
+        // Hidden columns give their room to the others.
+        let side_style = crate::view::Style {
+            mode: ViewMode::Lines,
+            icon_size: settings.small_icon_size(),
+            full_names: false,
+            shadow_hidden: settings.shadow_hidden(),
+            single_click: false,
+            hover_delay_ms: 0,
+            si_unit: settings.si_unit(),
+        };
+        let parent =
+            crate::view::mini::MiniColumn::new(side_style, settings.sort(), settings.show_hidden());
+        parent.widget().add_css_class("miller-parent");
+        parent.widget().set_visible(false);
+        let preview = preview::Preview::new(side_style, settings.sort(), settings.show_hidden());
+        preview.widget().add_css_class("miller-preview");
+        preview.widget().set_visible(false);
+        let page = gtk::Grid::new();
+        page.set_column_homogeneous(true);
+        page.attach(parent.widget(), 0, 0, 1, 1);
+        page.attach(&root, 1, 0, 4, 1);
+        page.attach(preview.widget(), 5, 0, 3, 1);
 
         let tab = Self(Rc::new(Inner {
             app: app.clone(),
+            page,
+            parent,
+            preview,
+            columns_shown: Cell::new((false, false)),
             root,
             scroller,
             empty,
@@ -195,7 +239,9 @@ impl TabPage {
             pin_start: Cell::new(true),
             pin_queued: Cell::new(false),
             wants_focus: Cell::new(false),
-            type_ahead,
+            cursor: cursor::Cursor::default(),
+            linemode: Cell::default(),
+            custom_title: RefCell::default(),
             load_started: Cell::new(None),
             stalls: RefCell::default(),
         }));
@@ -211,6 +257,7 @@ impl TabPage {
         let weak = tab.downgrade();
         selection.connect_selection_changed(move |_, _, _| {
             if let Some(tab) = weak.upgrade() {
+                tab.selection_changed();
                 tab.emit(Change::Selection);
             }
         });
@@ -218,7 +265,7 @@ impl TabPage {
         selection.connect_items_changed(move |_, _, _, _| {
             if let Some(tab) = weak.upgrade() {
                 tab.keep_at_start();
-                tab.forget_type_ahead_names();
+                tab.sync_cursor_later();
                 tab.update_placeholders();
                 tab.emit(Change::Status);
             }
@@ -227,7 +274,7 @@ impl TabPage {
         tab.watch_settings();
         tab.accept_drops_on_background();
         tab.watch_background_menu();
-        tab.connect_type_ahead();
+        tab.connect_columns();
         tab.0.history.borrow_mut().navigate(location);
         tab.load_folder_settings();
         tab.rebuild_view();
@@ -240,8 +287,8 @@ impl TabPage {
     }
 
     /// The widget to put in a notebook page.
-    pub fn widget(&self) -> &gtk::Overlay {
-        &self.0.root
+    pub fn widget(&self) -> &gtk::Grid {
+        &self.0.page
     }
 
     /// Registers a listener. It must capture its owner weakly.
@@ -291,6 +338,14 @@ impl TabPage {
                 .map(|thumbs| {
                     crate::view::thumbs::Loader::new(thumbs, self.0.app.settings().config())
                 }),
+            pressed: {
+                let weak = self.downgrade();
+                Rc::new(move |position, pressed| {
+                    if let Some(tab) = weak.upgrade() {
+                        tab.pressed(position, pressed);
+                    }
+                })
+            },
         }
     }
 
@@ -308,6 +363,12 @@ impl TabPage {
     }
 
     fn emit(&self, change: Change) {
+        match change {
+            Change::Cursor => self.update_preview(),
+            Change::Location => self.update_parent(),
+            Change::Status => self.sync_side_views(),
+            Change::Selection | Change::Load => {}
+        }
         let listeners = self.0.listeners.borrow().clone();
         for listener in listeners {
             listener(change);
@@ -321,11 +382,23 @@ impl TabPage {
 
     /// The folder's display name, used for the tab label and window title.
     pub fn title(&self) -> String {
+        if let Some(custom) = self.0.custom_title.borrow().as_ref() {
+            return custom.clone();
+        }
         let location = self.0.location.borrow();
         location
             .breadcrumbs()
             .last()
             .map_or_else(|| location.display(), |crumb| crumb.label.clone())
+    }
+
+    /// `t r`: names the tab; an empty name gives it back the folder's.
+    pub fn set_custom_title(&self, title: &str) {
+        let title = title.trim();
+        self.0
+            .custom_title
+            .replace((!title.is_empty()).then(|| title.to_owned()));
+        self.emit(Change::Location);
     }
 
     /// Whether this tab shows the trash can, where files cannot be cut,
@@ -344,26 +417,12 @@ impl TabPage {
         self.0.writable.get()
     }
 
-    /// Selects and scrolls to a file once the folder monitor reports it,
-    /// or at once when it is already listed.
+    /// Puts the cursor on a file once the folder monitor reports it, or at
+    /// once when it is already listed.
     pub fn select_when_listed(&self, uri: &str) {
-        if !self.select_uri(uri) {
+        if !self.hover_uri(uri) {
             self.0.awaited.replace(Some(uri.to_owned()));
         }
-    }
-
-    pub(super) fn select_uri(&self, uri: &str) -> bool {
-        let Some(position) = self.0.model.position_of(uri) else {
-            return false;
-        };
-        self.0.pin_start.set(false);
-        if let Some(view) = self.0.view.borrow().as_ref() {
-            view.scroll_to(
-                position,
-                gtk::ListScrollFlags::SELECT | gtk::ListScrollFlags::FOCUS,
-            );
-        }
-        true
     }
 
     /// The current load state.
@@ -455,10 +514,18 @@ impl TabPage {
             .map(|item| item.meta().display_name.clone())
             .collect();
         format!(
-            "location={} load={:?} mode={} sort={} columns={:?} preserve={} filter={:?} items={} visible={} hidden={} selected={} names={:?} scroll={:.0}",
+            "location={} load={:?} mode={} vim={} cursor={:?} at={} {} linemode={} needle={:?} sort={} columns={:?} preserve={} filter={:?} items={} visible={} hidden={} selected={} names={:?} scroll={:.0}",
             self.0.location.borrow().to_uri(),
             self.0.load.borrow(),
             self.0.mode.get(),
+            self.vim_mode().label(),
+            self.cursor_item()
+                .map(|item| item.meta().display_name.clone())
+                .unwrap_or_default(),
+            self.cursor().map_or(-1, i64::from),
+            self.columns_debug(),
+            self.0.linemode.get().name(),
+            model.needle().unwrap_or_default(),
             model.sort(),
             self.0.columns.borrow().to_string(),
             self.0.preserve.get(),

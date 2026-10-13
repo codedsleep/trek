@@ -334,6 +334,7 @@ fn general(settings: &Settings, shared: &Shared) -> gtk::Box {
         Settings::view_mode,
         set::view_mode,
         named(&[
+            ("Line View", ViewMode::Lines),
             ("Icon View", ViewMode::Icon),
             ("Thumbnail View", ViewMode::Thumbnail),
             ("Compact View", ViewMode::Compact),

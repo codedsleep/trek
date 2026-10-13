@@ -1,12 +1,15 @@
 //! File commands of the window: which files, which folder, which question
 //! to ask first. The operations themselves are jobs in `tallboy-fs`.
 
-use super::MainWindow;
+use super::{
+    MainWindow,
+    prompt::{Caret, Session},
+};
 use crate::{
     clipboard,
     dialogs::base,
     ops,
-    tab::location_from_uri,
+    tab::{TabPage, location_from_uri},
     view::{FileItem, dnd::DropRequest},
 };
 use gtk::{gio, glib, prelude::*};
@@ -45,19 +48,35 @@ fn uris(items: &[FileItem]) -> Vec<String> {
     items.iter().map(|item| item.meta().uri.clone()).collect()
 }
 
+fn names(items: &[FileItem]) -> Vec<String> {
+    items
+        .iter()
+        .map(|item| item.meta().display_name.clone())
+        .collect()
+}
+
 impl MainWindow {
     fn parent(&self) -> gtk::Window {
         self.0.window.clone().upcast()
     }
 
+    /// What a file command acts on: the selected files, or else the file
+    /// under the cursor.
     pub(super) fn selected(&self) -> Vec<FileItem> {
         self.active_tab()
-            .map(|tab| tab.model().selected())
+            .map(|tab| tab.targets())
             .unwrap_or_default()
     }
 
     pub(super) fn start_job(&self, kind: JobKind, title: &str) {
-        ops::start(&self.0.app, Some(&self.parent()), kind, title, |_| {});
+        ops::start(
+            &self.0.app,
+            Some(&self.parent()),
+            kind,
+            title,
+            false,
+            |_| {},
+        );
     }
 
     // ---- trash and delete ----
@@ -82,17 +101,11 @@ impl MainWindow {
             run();
             return;
         }
-        let question = match items.as_slice() {
-            [one] => format!(
-                "Do you want to move the file '{}' to trash can?",
-                one.meta().display_name
-            ),
-            many => format!(
-                "Do you want to move the {} selected files to trash can?",
-                many.len()
-            ),
+        let question = match items.len() {
+            1 => "Move this file to the trash can?".to_owned(),
+            count => format!("Move these {count} files to the trash can?"),
         };
-        self.ask_yes_no(&question, run);
+        self.ask_yes_no(&question, &names(&items), run);
     }
 
     /// Remove: permanent deletion, confirmed unless `confirm_del` is off.
@@ -108,30 +121,17 @@ impl MainWindow {
             run();
             return;
         }
-        let question = match items.as_slice() {
-            [one] => format!(
-                "Do you want to delete the file '{}'?",
-                one.meta().display_name
-            ),
-            many => format!("Do you want to delete the {} selected files?", many.len()),
+        let question = match items.len() {
+            1 => "Delete this file permanently?".to_owned(),
+            count => format!("Delete these {count} files permanently?"),
         };
-        self.ask_yes_no(&question, run);
+        self.ask_yes_no(&question, &names(&items), run);
     }
 
-    fn ask_yes_no(&self, question: &str, yes: impl FnOnce() + 'static) {
-        base::choose(
-            Some(&self.parent()),
-            "Confirm",
-            question,
-            &["No", "Yes"],
-            0,
-            1,
-            move |choice| {
-                if choice == 1 {
-                    yes();
-                }
-            },
-        );
+    /// A question over the files: `y` or Enter for yes, `n` or Esc for no.
+    fn ask_yes_no(&self, question: &str, names: &[String], yes: impl FnOnce() + 'static) {
+        self.clear_pending();
+        self.0.confirm.ask(question, names, yes);
     }
 
     // ---- properties ----
@@ -196,17 +196,23 @@ impl MainWindow {
     /// Empty Trash Can, after confirming.
     pub(super) fn empty_trash(&self) {
         let this = self.clone();
-        self.ask_yes_no("Are you sure you want to empty the trash can?", move || {
-            this.start_job(JobKind::EmptyTrash, "Emptying trash can")
-        });
+        self.ask_yes_no(
+            "Are you sure you want to empty the trash can?",
+            &[],
+            move || this.start_job(JobKind::EmptyTrash, "Emptying trash can"),
+        );
     }
 
     // ---- rename and create ----
 
-    /// Rename…: a dialog with the base name selected (§8.10).
+    /// `r`: an input line holding the name, the text cursor before the
+    /// extension as Yazi's `rename --cursor=before_ext` puts it.
     pub(super) fn rename_selection(&self) {
         let selected = self.selected();
         let (Some(tab), [item]) = (self.active_tab(), selected.as_slice()) else {
+            if selected.len() > 1 {
+                self.notice("Renaming several files at once is not available: select one");
+            }
             return;
         };
         let (uri, current) = {
@@ -215,86 +221,75 @@ impl MainWindow {
         };
         // `rename_range` counts bytes; the entry counts characters.
         let base = naming::rename_range(&current);
-        let select = 0..current[..base.end].chars().count() as i32;
+        let before_extension = current[..base.end].chars().count() as i32;
         let this = self.clone();
         let tab = tab.downgrade();
         let unchanged = current.clone();
-        base::prompt(
-            Some(&self.parent()),
-            "Rename File",
-            "Please enter a new name:",
+        self.0.input.open(
+            "Rename:",
             &current,
-            Some(select),
-            move |name| {
-                if name == unchanged {
-                    return None;
-                }
-                if naming::validate(name).is_err() {
-                    return Some(crate::dialogs::error::job(&jobs::JobError::Name(
-                        naming::InvalidName,
-                    )));
-                }
-                let (uri, name, this, tab) =
-                    (uri.clone(), name.to_owned(), this.clone(), tab.clone());
-                glib::spawn_future_local(async move {
-                    let target = name.clone();
-                    let result = gio::spawn_blocking(move || {
-                        jobs::rename(
-                            &gio::File::for_uri(&uri),
-                            &target,
-                            &Policy::from_environment(),
-                        )
-                        .map(|file| file.uri().to_string())
-                    })
-                    .await;
-                    match result {
-                        Ok(Ok(renamed)) => {
-                            if let Some(tab) = tab.upgrade() {
-                                tab.select_when_listed(&renamed);
-                            }
-                        }
-                        Ok(Err(e)) => base::alert(
-                            Some(&this.parent()),
-                            &format!("\"{name}\" could not be used as the new name"),
-                            &crate::dialogs::error::job(&e),
-                        ),
-                        Err(_) => log::warn!("rename worker stopped unexpectedly"),
+            Caret::At(before_extension),
+            Session {
+                changed: None,
+                cancel: None,
+                submit: Box::new(move |name| {
+                    if name == unchanged {
+                        return None;
                     }
-                });
-                None
+                    if naming::validate(name).is_err() {
+                        return Some(crate::dialogs::error::job(&jobs::JobError::Name(
+                            naming::InvalidName,
+                        )));
+                    }
+                    let (uri, name, this, tab) =
+                        (uri.clone(), name.to_owned(), this.clone(), tab.clone());
+                    glib::spawn_future_local(async move {
+                        let target = name.clone();
+                        let result = gio::spawn_blocking(move || {
+                            jobs::rename(
+                                &gio::File::for_uri(&uri),
+                                &target,
+                                &Policy::from_environment(),
+                            )
+                            .map(|file| file.uri().to_string())
+                        })
+                        .await;
+                        match result {
+                            Ok(Ok(renamed)) => {
+                                if let Some(tab) = tab.upgrade() {
+                                    tab.select_when_listed(&renamed);
+                                }
+                            }
+                            Ok(Err(e)) => base::alert(
+                                Some(&this.parent()),
+                                &format!("\"{name}\" could not be used as the new name"),
+                                &crate::dialogs::error::job(&e),
+                            ),
+                            Err(_) => log::warn!("rename worker stopped unexpectedly"),
+                        }
+                    });
+                    None
+                }),
             },
         );
     }
 
-    /// Create New ▸ Folder / Empty File: asks for the name, default "New";
-    /// the backend picks a unique name if it is taken (§8.10).
-    pub(super) fn create_new(&self, folder: bool) {
-        let Some(tab) = self.active_tab() else { return };
+    /// Creates a folder or an empty file in the tab's folder; the backend
+    /// picks a unique name if this one is taken (§8.10). Returns what is
+    /// wrong with the name, if anything; a failure to create is reported
+    /// once it is known.
+    pub(super) fn create_named(&self, tab: &TabPage, name: &str, folder: bool) -> Option<String> {
         let parent_uri = tab.location().to_uri().to_owned();
         let this = self.clone();
         let tab = tab.downgrade();
-        base::prompt(
-            Some(&self.parent()),
-            "Create New...",
-            if folder {
-                "Enter a name for the newly created folder:"
-            } else {
-                "Enter a name for the newly created file:"
-            },
-            "New",
-            None,
-            move |name| {
+        {
+            {
                 if naming::validate(name).is_err() {
                     return Some(crate::dialogs::error::job(&jobs::JobError::Name(
                         naming::InvalidName,
                     )));
                 }
-                let (parent_uri, name, this, tab) = (
-                    parent_uri.clone(),
-                    name.to_owned(),
-                    this.clone(),
-                    tab.clone(),
-                );
+                let name = name.to_owned();
                 glib::spawn_future_local(async move {
                     let result = gio::spawn_blocking(move || {
                         let parent = gio::File::for_uri(&parent_uri);
@@ -326,8 +321,8 @@ impl MainWindow {
                     }
                 });
                 None
-            },
-        );
+            }
+        }
     }
 
     // ---- copy, move, link ----
@@ -336,6 +331,18 @@ impl MainWindow {
     /// disk: a move within the same folder does nothing, and a folder cannot
     /// go into itself (§8.12).
     pub fn transfer(&self, sources: Vec<Location>, destination: &Location, how: Transfer) {
+        self.transfer_with(sources, destination, how, false);
+    }
+
+    /// [`Self::transfer`]; with `overwrite`, files that already exist at the
+    /// destination are replaced without asking (`P`).
+    pub fn transfer_with(
+        &self,
+        sources: Vec<Location>,
+        destination: &Location,
+        how: Transfer,
+        overwrite: bool,
+    ) {
         let intent = match how {
             Transfer::Copy => Intent::Copy,
             Transfer::Move => Intent::Move,
@@ -388,7 +395,14 @@ impl MainWindow {
                 "Creating symbolic links",
             ),
         };
-        self.start_job(kind, title);
+        ops::start(
+            &self.0.app,
+            Some(&self.parent()),
+            kind,
+            title,
+            overwrite,
+            |_| {},
+        );
     }
 
     /// Create Link…, Move to…, Copy to…: choose a folder, then run the job.
@@ -554,27 +568,31 @@ impl MainWindow {
         }
     }
 
-    /// Paste into the current folder.
-    pub(super) fn paste(&self) {
+    /// Paste into the current folder. `force` replaces existing files
+    /// without asking.
+    pub(super) fn paste(&self, force: bool) {
         if let Some(destination) = self.active_tab().map(|tab| tab.location()) {
-            self.paste_into(destination);
+            self.paste_into(destination, force);
         }
     }
 
     /// Pastes into `destination`: the current folder, or the single selected
     /// folder from its context menu. A cut becomes a move and empties the
     /// clipboard (§8.11).
-    pub(super) fn paste_into(&self, destination: Location) {
+    pub(super) fn paste_into(&self, destination: Location, force: bool) {
         let this = self.clone();
         clipboard::read(move |payload| {
-            let Some(payload) = payload else { return };
+            let Some(payload) = payload else {
+                this.notice("Nothing to paste");
+                return;
+            };
             let how = if payload.intent == Intent::Move {
                 clipboard::clear_own();
                 Transfer::Move
             } else {
                 Transfer::Copy
             };
-            this.transfer(payload.files, &destination, how);
+            this.transfer_with(payload.files, &destination, how, force);
         });
     }
 }

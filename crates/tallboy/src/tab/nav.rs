@@ -103,7 +103,9 @@ impl TabPage {
     }
 
     fn show(&self, location: Location) {
-        self.close_type_ahead();
+        self.end_visual();
+        // A filter belongs to the folder it was typed in.
+        self.0.model.set_needle(None);
         self.0.location.replace(location);
         // A folder may carry its own view mode, sort order and columns.
         self.load_folder_settings();
@@ -121,13 +123,6 @@ impl TabPage {
     }
 
     fn cursor_uri(&self) -> Option<String> {
-        let selection = self.0.model.selection().selection();
-        if selection.is_empty() {
-            return None;
-        }
-        self.0
-            .model
-            .item_at(selection.minimum())
-            .map(|item| item.meta().uri.clone())
+        self.cursor_item().map(|item| item.meta().uri.clone())
     }
 }

@@ -13,6 +13,7 @@ pub struct Toolbar {
     home: gtk::Button,
     history: gtk::MenuButton,
     path_slot: gtk::Box,
+    menu: gtk::MenuButton,
 }
 
 fn button(icon: &str, tooltip: &str, action: &str) -> gtk::Button {
@@ -32,7 +33,12 @@ impl Toolbar {
         let forward = button("go-next", "Next Folder", "win.forward");
         let up = button("go-up", "Parent Folder", "win.up");
         let home = button("go-home", "Home Folder", "win.home");
-        let go = button("go-jump", "Go", "win.pathbar-go");
+        // Everything the hidden menu bar holds.
+        let menu = gtk::MenuButton::new();
+        menu.set_icon_name("open-menu-symbolic");
+        menu.set_tooltip_text(Some("Menu (F10)"));
+        menu.add_css_class("flat");
+        menu.set_focus_on_click(false);
 
         // The history menu, as upstream's arrow between Back and Forward.
         let history = gtk::MenuButton::new();
@@ -77,7 +83,7 @@ impl Toolbar {
             navigation.upcast_ref(),
             home.upcast_ref(),
             path_slot.upcast_ref(),
-            go.upcast_ref(),
+            menu.upcast_ref(),
         ] {
             root.append(widget);
         }
@@ -89,7 +95,13 @@ impl Toolbar {
             home,
             history,
             path_slot,
+            menu,
         }
+    }
+
+    /// The button that opens the application menu.
+    pub fn menu_button(&self) -> &gtk::MenuButton {
+        &self.menu
     }
 
     pub fn widget(&self) -> &gtk::Box {

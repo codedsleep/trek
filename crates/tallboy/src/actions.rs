@@ -54,6 +54,10 @@ pub enum Cmd {
     ShowStatusbar,
     DualPane,
     FocusNextPane,
+    ShowMenubar,
+    Menu,
+    MillerParent,
+    MillerPreview,
     Fullscreen,
     ZoomIn,
     ZoomOut,
@@ -152,11 +156,15 @@ const fn deferred(name: &'static str, accels: &'static [&'static str], cmd: Cmd)
 
 use Kind::{Index, Plain, Radio, Text, Toggle};
 
-/// Every window action. Accelerators are upstream's (`main-win-ui.c`).
+/// Every window action.
 ///
-/// Move to Trash, Remove, Parent Folder via Backspace and the other §8.8 view
-/// keys are deliberately not accelerators: upstream binds them to the folder
-/// view, and so does `view::keys`, which keeps them away from text entries.
+/// The keys of the file view are not here: they are Yazi's, in
+/// `core::keymap`, and `window::keys` runs them. An accelerator in this
+/// table is a key Yazi leaves alone that a program with a window is expected
+/// to have — function keys, Ctrl+T, Alt+Left. None may also be a binding of
+/// the keymap; a test in `window::keys` holds that line. Accelerators are
+/// switched off while a text entry has the keyboard, so that every key
+/// typed there is the entry's.
 pub const TABLE: &[Def] = &[
     // File
     def("new-window", Plain, &["<Control>n"], Cmd::NewWindow),
@@ -173,9 +181,9 @@ pub const TABLE: &[Def] = &[
     def("close-window", Plain, &["<Control>q"], Cmd::CloseWindow),
     // Edit
     def("open", Plain, &[], Cmd::Open),
-    def("cut", Plain, &["<Control>x"], Cmd::Cut),
-    def("copy", Plain, &["<Control>c"], Cmd::Copy),
-    def("paste", Plain, &["<Control>v"], Cmd::Paste),
+    def("cut", Plain, &[], Cmd::Cut),
+    def("copy", Plain, &[], Cmd::Copy),
+    def("paste", Plain, &[], Cmd::Paste),
     def("trash", Plain, &[], Cmd::Trash),
     def("delete", Plain, &[], Cmd::Delete),
     def("copy-path", Plain, &[], Cmd::CopyPath),
@@ -184,24 +192,19 @@ pub const TABLE: &[Def] = &[
     def("create-link", Plain, &[], Cmd::CreateLink),
     def("move-to", Plain, &[], Cmd::MoveTo),
     def("copy-to", Plain, &[], Cmd::CopyTo),
-    def("select-all", Plain, &["<Control>a"], Cmd::SelectAll),
-    def(
-        "invert-selection",
-        Plain,
-        &["<Control>i"],
-        Cmd::InvertSelection,
-    ),
+    def("select-all", Plain, &[], Cmd::SelectAll),
+    def("invert-selection", Plain, &[], Cmd::InvertSelection),
     // Esc on the view (§8.8); not in any menu.
     def("unselect-all", Plain, &[], Cmd::UnselectAll),
     def("preferences", Plain, &[], Cmd::Preferences),
     // View
-    def("reload", Plain, &["F5", "<Control>r"], Cmd::Reload),
-    def("show-hidden", Toggle, &["<Control>h"], Cmd::ShowHidden),
+    def("reload", Plain, &["F5"], Cmd::Reload),
+    def("show-hidden", Toggle, &[], Cmd::ShowHidden),
     def("sort-order", Radio("ascending"), &[], Cmd::SortOrder),
     def("sort-by", Radio("name"), &[], Cmd::SortBy),
     def("sort-mingle", Toggle, &[], Cmd::SortMingle),
     def("sort-ignore-case", Toggle, &[], Cmd::SortIgnoreCase),
-    def("view-mode", Radio("icon"), &[], Cmd::ViewMode),
+    def("view-mode", Radio("lines"), &[], Cmd::ViewMode),
     def("preserve-settings", Toggle, &[], Cmd::PreserveSettings),
     def("toolbar-show", Toggle, &[], Cmd::ToolbarShow),
     def("toolbar-newwin", Toggle, &[], Cmd::ToolbarNewWin),
@@ -211,16 +214,17 @@ pub const TABLE: &[Def] = &[
     def("pathbar-mode", Radio("location"), &[], Cmd::PathbarMode),
     def("sidepane-show", Toggle, &["F9"], Cmd::SidePaneShow),
     def("sidepane-mode", Radio("places"), &[], Cmd::SidePaneMode),
-    def(
-        "show-statusbar",
-        Toggle,
-        &["<Control>b"],
-        Cmd::ShowStatusbar,
-    ),
+    def("show-statusbar", Toggle, &[], Cmd::ShowStatusbar),
+    def("show-menubar", Toggle, &[], Cmd::ShowMenubar),
+    // Opens the menu button's menu, the menu bar being hidden by default.
+    def("menu", Plain, &["F10"], Cmd::Menu),
+    def("miller-parent", Toggle, &["F7"], Cmd::MillerParent),
+    def("miller-preview", Toggle, &["F8"], Cmd::MillerPreview),
     def("dual-pane", Toggle, &["F3"], Cmd::DualPane),
     def("fullscreen", Toggle, &["F11"], Cmd::Fullscreen),
     // §8.5: side pane, pane 1, pane 2. Not in any menu.
     def("focus-next-pane", Plain, &["F6"], Cmd::FocusNextPane),
+    // Ctrl+minus is Yazi's hard link, on the keypad too, so zooming out is on Alt.
     def(
         "zoom-in",
         Plain,
@@ -230,13 +234,13 @@ pub const TABLE: &[Def] = &[
     def(
         "zoom-out",
         Plain,
-        &["<Control>KP_Subtract", "<Control>minus"],
+        &["<Alt>minus", "<Alt>KP_Subtract"],
         Cmd::ZoomOut,
     ),
     def("zoom-normal", Plain, &["<Control>0"], Cmd::ZoomNormal),
-    def("filter", Plain, &["<Control>e"], Cmd::Filter),
+    def("filter", Plain, &[], Cmd::Filter),
     // Bookmarks
-    def("add-bookmark", Plain, &["<Control>d"], Cmd::AddBookmark),
+    def("add-bookmark", Plain, &[], Cmd::AddBookmark),
     def("edit-bookmarks", Plain, &[], Cmd::EditBookmarks),
     // One item per bookmark in the Bookmarks menu; the target is its URI.
     def("open-bookmark", Text, &[], Cmd::OpenBookmark),
@@ -250,12 +254,7 @@ pub const TABLE: &[Def] = &[
     deferred("go-applications", &[], Cmd::GoApplications),
     def("go-devices", Plain, &[], Cmd::GoDevices),
     def("go-network", Plain, &[], Cmd::GoNetwork),
-    def(
-        "go-location",
-        Plain,
-        &["<Control>l", "<Alt>d"],
-        Cmd::GoLocation,
-    ),
+    def("go-location", Plain, &["<Control>l"], Cmd::GoLocation),
     def("connect-server", Plain, &[], Cmd::ConnectServer),
     // Tools
     def("terminal", Plain, &["F4"], Cmd::Terminal),
@@ -300,38 +299,29 @@ pub const TABLE: &[Def] = &[
 
 /// Radio accelerators and other accelerators that carry a target value.
 pub const TARGETED: &[(&str, &[&str])] = &[
-    ("win.sort-by::name", &["<Control><Alt>1"]),
-    ("win.sort-by::mtime", &["<Control><Alt>2"]),
-    ("win.sort-by::size", &["<Control><Alt>3"]),
-    ("win.sort-by::desc", &["<Control><Alt>4"]),
-    ("win.sort-by::ext", &["<Control><Alt>5"]),
-    ("win.view-mode::icon", &["<Control>1"]),
-    ("win.view-mode::compact", &["<Control>2"]),
-    ("win.view-mode::thumbnail", &["<Control>3"]),
-    ("win.view-mode::list", &["<Control>4"]),
+    ("win.view-mode::lines", &["<Control>1"]),
+    ("win.view-mode::icon", &["<Control>2"]),
+    ("win.view-mode::compact", &["<Control>3"]),
+    ("win.view-mode::thumbnail", &["<Control>4"]),
+    ("win.view-mode::list", &["<Control>5"]),
     ("win.sidepane-mode::places", &["<Control>6"]),
     ("win.sidepane-mode::dirtree", &["<Control>7"]),
-    ("win.goto-tab(0)", &["<Alt>1"]),
-    ("win.goto-tab(1)", &["<Alt>2"]),
-    ("win.goto-tab(2)", &["<Alt>3"]),
-    ("win.goto-tab(3)", &["<Alt>4"]),
-    ("win.goto-tab(4)", &["<Alt>5"]),
-    ("win.goto-tab(5)", &["<Alt>6"]),
-    ("win.goto-tab(6)", &["<Alt>7"]),
-    ("win.goto-tab(7)", &["<Alt>8"]),
-    ("win.goto-tab(8)", &["<Alt>9"]),
-    ("win.goto-tab(9)", &["<Alt>0"]),
 ];
 
-/// Registers every accelerator with the application.
-pub fn install_accels(app: &gtk::Application) {
+/// Registers every accelerator with the application, or with `enabled`
+/// false takes them all away again: while a text entry has the keyboard no
+/// key belongs to a window action.
+pub fn install_accels(app: &gtk::Application, enabled: bool) {
     for def in TABLE {
         if !def.accels.is_empty() {
-            app.set_accels_for_action(&format!("win.{}", def.name), def.accels);
+            app.set_accels_for_action(
+                &format!("win.{}", def.name),
+                if enabled { def.accels } else { &[] },
+            );
         }
     }
     for (action, accels) in TARGETED {
-        app.set_accels_for_action(action, accels);
+        app.set_accels_for_action(action, if enabled { accels } else { &[] });
     }
 }
 

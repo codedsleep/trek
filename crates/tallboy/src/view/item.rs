@@ -1,18 +1,26 @@
 //! `FileItem`: the only item type in a folder's list store.
 
-use gtk::{gio, glib, subclass::prelude::*};
+use gtk::{gio, glib, prelude::*, subclass::prelude::*};
 use std::{
-    cell::{Ref, RefCell},
-    collections::{HashMap, VecDeque},
+    cell::{Cell, Ref, RefCell},
+    collections::{HashMap, HashSet, VecDeque},
 };
 use tallboy_fs::meta::FileMeta;
 
 mod imp {
     use super::*;
 
-    #[derive(Default)]
+    #[derive(Default, glib::Properties)]
+    #[properties(wrapper_type = super::FileItem)]
     pub struct FileItem {
         pub meta: RefCell<Option<FileMeta>>,
+        /// The cursor is on this item. Cells follow the property, so the
+        /// cursor is drawn whether or not the view has the keyboard.
+        #[property(get, set, explicit_notify)]
+        pub hovered: Cell<bool>,
+        /// 0, or [`YANK_COPY`] or [`YANK_CUT`] while the file is yanked.
+        #[property(get, set, explicit_notify)]
+        pub yank: Cell<u8>,
     }
 
     #[glib::object_subclass]
@@ -21,7 +29,49 @@ mod imp {
         type Type = super::FileItem;
     }
 
+    #[glib::derived_properties]
     impl ObjectImpl for FileItem {}
+}
+
+/// `yank` of a file that `y` put on the clipboard.
+pub const YANK_COPY: u8 = 1;
+/// `yank` of a file that `x` put on the clipboard.
+pub const YANK_CUT: u8 = 2;
+
+/// The files this process yanked, and whether they were cut.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Yanked {
+    pub uris: HashSet<String>,
+    pub cut: bool,
+}
+
+thread_local! {
+    /// What `y` or `x` last put on the clipboard, until it is pasted as a
+    /// move, unyanked, or replaced by another program's clipboard.
+    static YANKED: RefCell<Option<Yanked>> = const { RefCell::new(None) };
+}
+
+/// Replaces the yanked set. Listed items are told by their tab.
+pub fn set_yanked(yanked: Option<Yanked>) {
+    YANKED.set(yanked);
+}
+
+/// How many files are yanked, and whether they were cut.
+pub fn yanked() -> Option<(usize, bool)> {
+    YANKED.with_borrow(|yanked| yanked.as_ref().map(|y| (y.uris.len(), y.cut)))
+}
+
+fn yank_state(uri: &str) -> u8 {
+    YANKED.with_borrow(|yanked| match yanked {
+        Some(yanked) if yanked.uris.contains(uri) => {
+            if yanked.cut {
+                YANK_CUT
+            } else {
+                YANK_COPY
+            }
+        }
+        _ => 0,
+    })
 }
 
 glib::wrapper! {
@@ -66,8 +116,24 @@ impl FileItem {
     /// Wraps `meta`.
     pub fn new(meta: FileMeta) -> Self {
         let item: Self = glib::Object::new();
+        item.imp().yank.set(yank_state(&meta.uri));
         item.imp().meta.replace(Some(meta));
         item
+    }
+
+    /// Puts the cursor on this item or takes it off.
+    pub fn hover(&self, hovered: bool) {
+        if self.imp().hovered.replace(hovered) != hovered {
+            self.notify_hovered();
+        }
+    }
+
+    /// Brings the yank mark in line with the yanked set.
+    pub fn refresh_yank(&self) {
+        let state = yank_state(&self.meta().uri);
+        if self.imp().yank.replace(state) != state {
+            self.notify_yank();
+        }
     }
 
     /// The file's metadata. The borrow must not be held across a call that
@@ -101,7 +167,6 @@ impl FileItem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gtk::prelude::*;
 
     #[test]
     fn distinct_file_icons_do_not_accumulate_after_tabs_close() {

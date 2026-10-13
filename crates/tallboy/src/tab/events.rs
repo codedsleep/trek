@@ -159,7 +159,7 @@ impl TabPage {
         let uri = uri.to_owned();
         glib::idle_add_local_full(glib::Priority::HIGH_IDLE, move || {
             if let Some(tab) = weak.upgrade() {
-                tab.select_uri(&uri);
+                tab.hover_uri(&uri);
             }
             glib::ControlFlow::Break
         });
@@ -234,7 +234,7 @@ impl TabPage {
             // arrived with the listing itself, not as a later change.
             let awaited = tab.0.awaited.borrow().clone();
             if let Some(uri) = awaited
-                && tab.select_uri(&uri)
+                && tab.hover_uri(&uri)
             {
                 tab.0.awaited.replace(None);
                 return glib::ControlFlow::Break;
@@ -242,13 +242,8 @@ impl TabPage {
             // The keyboard focus was given to whichever item came first
             // while loading; now that the order is final, put it on the
             // real first item, or a later relayout scrolls to the old one.
-            if tab.0.pin_start.replace(false)
-                && tab.has_focus()
-                && tab.0.model.selected_count() == 0
-                && tab.0.model.visible_count() > 0
-                && let Some(view) = tab.0.view.borrow().as_ref()
-            {
-                view.scroll_to(0, gtk::ListScrollFlags::FOCUS);
+            if tab.0.pin_start.replace(false) && tab.0.model.visible_count() > 0 {
+                tab.place_cursor(0, true);
             }
             glib::ControlFlow::Break
         });
@@ -257,21 +252,14 @@ impl TabPage {
     fn restore_view_state(&self) {
         let Restore { cursor, scroll } = self.0.restore.take();
         let position = cursor.and_then(|uri| self.0.model.position_of(&uri));
-        let view = self.0.view.borrow();
-        let Some(view) = view.as_ref() else {
-            return;
-        };
         if position.is_some() {
             self.0.pin_start.set(false);
         }
         match (position, scroll) {
-            (Some(position), None) => view.scroll_to(
-                position,
-                gtk::ListScrollFlags::SELECT | gtk::ListScrollFlags::FOCUS,
-            ),
+            (Some(position), None) => self.place_cursor(position, true),
             (position, Some(scroll)) => {
                 if let Some(position) = position {
-                    self.0.model.selection().select_item(position, true);
+                    self.place_cursor(position, false);
                 }
                 // The adjustment's range is only known after the next layout.
                 let adjustment = self.scroll_adjustment();
