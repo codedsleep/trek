@@ -48,6 +48,7 @@ one() {
     local name=$1
     case $name in
         vim) seed; run_session --size 1400x800 --timeout 240 -- "$fixture/names" <"$checks/vim.sh" ;;
+        finder) seed; run_session --size 1400x800 --timeout 120 -- "$fixture/names" <"$checks/finder.sh" ;;
         navigation)
             seed '[ui]\npathbar_mode_buttons=0\n'
             run_session --keep -- "$fixture/deep" <"$checks/navigation.sh"
@@ -84,7 +85,7 @@ one() {
 
 names=("$@")
 if [[ ${#names[@]} -eq 0 ]]; then
-    names=(vim navigation opening single-click fileops dnd dnd-ask progress menus sidepane
+    names=(vim finder navigation opening single-click fileops dnd dnd-ask progress menus sidepane
         properties dual-pane prefs leaks filemanager1 session)
 fi
 failed=0

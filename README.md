@@ -33,6 +33,7 @@ at the bottom of the window.
 | `y` `x` `p` `P`, `Y` `X`, `-` | yank, cut, paste, paste over; unyank; link |
 | `d` `D`, `a`, `r` | trash, delete; create (end with `/` for a folder); rename |
 | `/` `?` `n` `N`, `f` | find, next, previous; filter |
+| `z` | fuzzy finder over everything below the folder |
 | `.`, `m…`, `,…` | hidden files; linemode; sort |
 | `c…` | copy path, URL, folder path, name |
 | `g…` | home, `~/.config`, Downloads, trash can, location entry, follow link |
@@ -51,12 +52,40 @@ the location entry or a dialog, every key is text; the input line has Yazi's
 insert-mode keys (`Ctrl+A` `Ctrl+E` `Ctrl+U` `Ctrl+K` `Ctrl+W` and friends).
 A question is answered with `y` or `Enter`, and `n` or `Esc`.
 
+### The fuzzy finder
+
+`z` lists everything below the folder shown and narrows the list as you
+type: the letters of the query have to occur in a path in that order, not
+side by side, and the best matches come first. `wvim` finds
+`src/window/vim.rs`. `Enter` enters a folder, or goes to a file's folder and
+puts the cursor on the file; `Esc` closes the list.
+
+- The query is fzf's: words separated by spaces must all match, in any
+  order; `'word` matches exactly, `^word` at the start, `word$` at the end,
+  `!word` leaves out what matches. Without a capital letter it ignores case.
+- `Down` `Up`, `Ctrl+N` `Ctrl+P`, `Ctrl+J` `Ctrl+K`, `Tab` `Shift+Tab` and
+  the page keys move through the list; the wheel does too, and a click goes
+  to a row.
+- Like fd it leaves out what `.gitignore` excludes inside a repository, and
+  what `.ignore` and your global Git ignore file exclude anywhere; it never
+  looks inside `.git`. Hidden files are searched when they are shown (`.`).
+  Symbolic links are listed, not followed.
+- The folder is listed in the background and matched on all cores, so a
+  home folder with several hundred thousand files can be searched while it
+  is still being read. A million files is the limit; past it the count says
+  so.
+- Only folders on this computer can be searched, not the trash can or a
+  network location.
+
+Yazi starts fzf for this. fzf draws in a terminal, so here the list is the
+window's own; fzf does not have to be installed.
+
 ### What differs from Yazi
 
-- Nine bindings answer "not available" in the status line and do nothing
-  else: `s` and `S` (search with fd and ripgrep), `Ctrl+S`, `z` and `Z` (fzf
-  and zoxide), `A` (bulk create), `_` (relative link), `Ctrl+-` (hard link)
-  and `,r` (random order).
+- Eight bindings answer "not available" in the status line and do nothing
+  else: `s` and `S` (search with fd and ripgrep), `Ctrl+S`, `Z` (zoxide),
+  `A` (bulk create), `_` (relative link), `Ctrl+-` (hard link) and `,r`
+  (random order).
 - `r` renames one file; with several selected it says so instead of opening
   an editor.
 - `,a` and `,n` are the same order: names are always compared the natural
