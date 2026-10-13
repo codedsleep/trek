@@ -1,15 +1,19 @@
 .TH TALLBOY 1 "October 2026" "tallboy 0.1.0" "User Commands"
 .SH NAME
-tallboy \- a file manager for people who know PCManFM
+tallboy \- a graphical file manager with the keys of Yazi
 .SH SYNOPSIS
 .B tallboy
 .RI [ OPTION ]...
 .RI [ FILE | URI ]...
 .SH DESCRIPTION
 .B tallboy
-is a port of the PCManFM file manager to Rust and GTK 4.
-It keeps PCManFM's menus, shortcuts, view modes, tabs, dual pane, side
-pane, trash can, volume handling and dialogs.
+is a graphical file manager driven from the keyboard with the key bindings
+of Yazi: the parent folder, the files and a preview side by side, a cursor
+moved with h, j, k and l, and a selection built with Space or visual mode.
+Press ~ or F1 in the window for the list of keys.
+It began as a port of PCManFM to Rust and GTK 4, and keeps PCManFM's menus,
+view modes, tabs, dual pane, side pane, trash can, volume handling and
+dialogs.
 .PP
 Folders named on the command line open as tabs in the window that was last
 used, or in a new window when there is none; files are opened with their

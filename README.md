@@ -1,23 +1,113 @@
 # tallboy
 
-A port of the [PCManFM](https://github.com/lxde/pcmanfm) file manager to Rust
-and GTK 4, for people who already know PCManFM: the same menus and shortcuts,
-the same four view modes, tabs, dual pane, Places and the directory tree, the
-trash can, volume handling and dialogs.
+A graphical file manager driven from the keyboard with the keys of
+[Yazi](https://yazi-rs.github.io): `h` `j` `k` `l` to move, `y` `x` `p` to
+yank, cut and paste, `v` for visual mode, `/` to find, `g`, `m`, `c` and `,`
+to start a sequence. The window is laid out the way Yazi's screen is — the
+parent folder, the files, a preview — and stays a GTK 4 program underneath:
+mouse, drag and drop, menus, trash can, volumes and remote places all work.
 
-Based on PCManFM by Hong Jen Yee (PCMan) and Andriy Grytsenko (LStranger), and
-on their libfm. The reference is PCManFM 1.4.0 with libfm 1.4.1.
-Licensed GPL-2.0-or-later, as they are; see `COPYING`.
+It began as a port of [PCManFM](https://github.com/lxde/pcmanfm) to Rust and
+GTK 4, and everything that is not keys or layout still behaves as PCManFM
+does. Based on PCManFM by Hong Jen Yee (PCMan) and Andriy Grytsenko
+(LStranger), and on their libfm; the reference is PCManFM 1.4.0 with libfm
+1.4.1. Licensed GPL-2.0-or-later, as they are; see `COPYING`.
 
 > **This build is locked.** Until its review is finished it changes files only
 > inside its test folders. Read [The safety lock](#the-safety-lock) before
 > pointing it at anything you care about.
 
+## Keys
+
+The keys of the file view are Yazi 26.9's default `[mgr]` keymap, all 116
+bindings, with Yazi's own descriptions. `~` or `F1` lists them, with a field
+that narrows the list as you type; a started sequence lists its continuations
+at the bottom of the window.
+
+| | |
+|---|---|
+| `j` `k`, `gg` `G`, `Ctrl+U` `Ctrl+D` `Ctrl+B` `Ctrl+F` | move the cursor; single steps wrap around |
+| `h` `l`, `H` `L` | parent folder, enter; back, forward |
+| `Space`, `v` `V`, `Ctrl+A` `Ctrl+R`, `Esc` | toggle, visual mode, select all, invert, clear |
+| `o` `Enter`, `O` `Shift+Enter` | open; open with |
+| `y` `x` `p` `P`, `Y` `X`, `-` | yank, cut, paste, paste over; unyank; link |
+| `d` `D`, `a`, `r` | trash, delete; create (end with `/` for a folder); rename |
+| `/` `?` `n` `N`, `f` | find, next, previous; filter |
+| `.`, `m…`, `,…` | hidden files; linemode; sort |
+| `c…` | copy path, URL, folder path, name |
+| `g…` | home, `~/.config`, Downloads, trash can, location entry, follow link |
+| `tt` `tr`, `1`–`9`, `[` `]`, `{` `}` | new tab, name it; switch; step; swap |
+| `;` `:` | shell command, here or in a terminal; the files are `"$@"` |
+| `J` `K`, `Tab`, `w`, `q` `Ctrl+C` | scroll the preview, properties, running jobs, close |
+
+As in Yazi, the cursor and the selection are different things: moving the
+cursor selects nothing, and a command acts on the selected files, or on the
+file under the cursor when none is selected. Yanked files are on the
+clipboard, where other programs can paste them, and files copied in other
+programs can be pasted with `p`.
+
+Keys are commands only while the files have the keyboard. In the input line,
+the location entry or a dialog, every key is text; the input line has Yazi's
+insert-mode keys (`Ctrl+A` `Ctrl+E` `Ctrl+U` `Ctrl+K` `Ctrl+W` and friends).
+A question is answered with `y` or `Enter`, and `n` or `Esc`.
+
+### What differs from Yazi
+
+- Nine bindings answer "not available" in the status line and do nothing
+  else: `s` and `S` (search with fd and ripgrep), `Ctrl+S`, `z` and `Z` (fzf
+  and zoxide), `A` (bulk create), `_` (relative link), `Ctrl+-` (hard link)
+  and `,r` (random order).
+- `r` renames one file; with several selected it says so instead of opening
+  an editor.
+- `,a` and `,n` are the same order: names are always compared the natural
+  way.
+- `P` replaces existing files without asking, except that a folder is never
+  replaced by a file: that still asks.
+- `Tab` opens Properties, `w` brings up the progress windows of running jobs,
+  `Ctrl+Z` minimises the window.
+- The input line edits like any text entry; it has no normal mode.
+- `a` creates one file or one folder, not a path of several.
+- In the icon, thumbnail and compact views `j` and `k` step through the files
+  in order; `h` and `l` still leave and enter.
+
+### Keys that are not Yazi's
+
+Yazi leaves these alone, and a program with a window is expected to have
+them: `Backspace` (parent), `Delete` and `Shift+Delete`, `F2`, `F5`,
+`Alt+Enter`, `Ctrl+L`, `Alt+Left` `Alt+Right` `Alt+Up` `Alt+Home`, `Ctrl+T`
+`Ctrl+W` `Ctrl+N` `Ctrl+Q`, `Ctrl+Tab`, `Ctrl+1`…`Ctrl+5` for the five views,
+`Ctrl+=` `Alt+-` `Ctrl+0` to zoom, `F3` `F6` for dual-pane mode, `F7` `F8`
+for the parent and preview columns, `F9` for the side pane, `F10` for the
+menu and `F11` for full screen.
+
+PCManFM's `Ctrl+C`, `Ctrl+X` and `Ctrl+V` are gone: `Ctrl+C` is Yazi's "close
+the tab", and half a set of clipboard keys would be a trap. So are `Ctrl+A`
+as an accelerator (it is Yazi's own), `Ctrl+R`, `Ctrl+D`, `Ctrl+B`, `Ctrl+H`,
+`Ctrl+E`, `Ctrl+I` and `Alt+1`…`Alt+0`, and typing a name to jump to it: that
+is `/` now.
+
+## The window
+
+- **Three columns**, one part parent folder, four parts files, three parts
+  preview. The preview lists a folder, shows the start of a text file, draws
+  an image, and gives anything else a card with its type, size, date and
+  permissions. Only local files are read. `F7` and `F8` hide a column; in
+  dual-pane mode both are hidden.
+- **The line view**, one file per row with the linemode at the right, is the
+  default. The icon, compact, thumbnail and detailed-list views are still
+  there (`Ctrl+2`…`Ctrl+5`); they draw the cursor as a frame.
+- **The status line** shows the mode (`NOR`, `SEL`, `UNS`), the file under the
+  cursor, the keys of a started sequence, the filter, how many files are
+  selected and yanked, and the cursor's position.
+- **No menu bar** unless you ask for one (View ▸ Show Menu Bar): the button at
+  the right of the path holds the same menus, and `F10` opens it. The side
+  pane starts hidden (`F9`).
+
 ## What it does
 
-- **Browsing.** Icon, thumbnail, compact and detailed-list views; sorting by
-  name, date, size, type or extension, with folders first; hidden files; a
-  filter; zoom; view settings remembered per folder; type-ahead search.
+- **Browsing.** Line, icon, thumbnail, compact and detailed-list views;
+  sorting by name, date, size, type or extension, with folders first; hidden
+  files; a filter; zoom; view settings remembered per folder.
 - **Getting around.** Tabs; dual-pane mode (`F3`, `F6` moves between panes); a
   location entry with completion or breadcrumb buttons; back, forward and
   history; bookmarks shared with GTK file choosers.
@@ -155,8 +245,9 @@ Two things the lock does not cover and the review will not change:
 
 ## Differences from PCManFM
 
-Everything not listed here is meant to behave as PCManFM 1.4.0 does. This is
-the list kept in `.planning/SCOPE.md` §10, in the same order.
+Keys and layout are Yazi's, as described above. Everything else that is not
+listed here is meant to behave as PCManFM 1.4.0 does. This is the list kept
+in `.planning/SCOPE.md` §10, in the same order.
 
 1. Find Files, templates, archivers, custom actions and the applications folder are absent; their menu items are disabled or omitted
 2. No desktop manager; its command-line options report that it is not built
