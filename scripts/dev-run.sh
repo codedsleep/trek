@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs tallboy on the live display for owner QA, away from the owner's real
 # configuration: private D-Bus session, XDG directories under
-# ~/.cache/tallboy-dev and the profile "dev" (DISCOVERY D14; SCOPE S5).
+# ~/.cache/vim-centric-fm-dev and the profile "dev" (DISCOVERY D14; SCOPE S5).
 #
 #   scripts/dev-run.sh [--debug] [--reset] [tallboy arguments]
 #
@@ -18,7 +18,7 @@
 # applications opened from tallboy start with the same isolated settings.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
-dev_home="$HOME/.cache/tallboy-dev"
+dev_home="$HOME/.cache/vim-centric-fm-dev"
 fixture="$HOME/.cache/tallboy-fixture"
 build=release
 while [[ $# -gt 0 ]]; do

@@ -162,8 +162,8 @@ command that undoes the first of those.
     scripts/dev-run.sh                   # tallboy on the fixture, with its own settings
 
 `dev-run.sh` uses its own D-Bus session and its own configuration, cache and
-data folders under `~/.cache/tallboy-dev`, so its bookmarks, trash can and
-default applications are not yours.
+data folders under `~/.cache/vim-centric-fm-dev`, so its bookmarks, trash can
+and default applications are not yours.
 
 ### Coming from PCManFM
 
