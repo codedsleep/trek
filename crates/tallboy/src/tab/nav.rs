@@ -13,6 +13,29 @@ impl TabPage {
         self.show(location);
     }
 
+    /// Goes to what the fuzzy finder found: into a folder, or to the folder
+    /// of a file with the cursor on the file.
+    pub fn jump_to(&self, path: &std::path::Path, enter: bool) {
+        let file = gio::File::for_path(path);
+        let target = if enter {
+            Some(file.clone())
+        } else {
+            file.parent()
+        };
+        let Some(folder) = target.and_then(|folder| location_from_uri(&folder.uri())) else {
+            return;
+        };
+        if folder.to_uri() != self.0.location.borrow().to_uri() {
+            self.navigate(folder);
+        } else if !enter {
+            // Found in the folder shown, where the `f` filter may hide it.
+            self.set_needle(None);
+        }
+        if !enter {
+            self.select_when_listed(&file.uri());
+        }
+    }
+
     /// Loads the current folder again, keeping scroll position and selection.
     pub fn reload(&self) {
         let cursor = self.cursor_uri();

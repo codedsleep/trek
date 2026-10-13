@@ -94,8 +94,8 @@ impl MainWindow {
             | Action::BulkCreate
             | Action::Search(_)
             | Action::CancelSearch
-            | Action::Fzf
             | Action::Zoxide => {}
+            Action::Fzf => self.ask_jump(&tab),
             Action::Linemode(linemode) => tab.set_linemode(linemode),
             Action::Copy(what) => self.copy_text(&tab, what),
             Action::Filter => self.ask_filter_live(&tab),

@@ -372,8 +372,9 @@ impl MainWindow {
             .map(|window| window.title().unwrap_or_default().to_string())
             .collect();
         eprintln!(
-            "tallboy state: {tab} focus={focus} input={} confirm={} pending={:?} which_key={} notice={:?} yanked={:?} toplevels={} dialogs={:?} title={:?} {} clipboard={:?} {} panes={} active_pane={} tabs={} {}",
+            "tallboy state: {tab} focus={focus} input={} finder={} confirm={} pending={:?} which_key={} notice={:?} yanked={:?} toplevels={} dialogs={:?} title={:?} {} clipboard={:?} {} panes={} active_pane={} tabs={} {}",
             self.0.input.debug_state(),
+            self.0.finder.debug_state(),
             self.0.confirm.debug_state(),
             self.0
                 .pending

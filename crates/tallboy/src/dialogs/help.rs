@@ -49,7 +49,6 @@ pub fn unavailable(action: Action) -> Option<&'static str> {
         Action::Search(SearchVia::Fd) => "Search by name (fd) is not available",
         Action::Search(SearchVia::Rg) => "Search by content (ripgrep) is not available",
         Action::CancelSearch => "There is no search to cancel",
-        Action::Fzf => "Jumping with fzf is not available",
         Action::Zoxide => "Jumping with zoxide is not available",
         Action::Sort {
             by: SortBy::Random, ..
@@ -241,7 +240,7 @@ mod tests {
     /// What the key list calls unavailable is exactly what answers with a
     /// notice instead of doing something.
     #[test]
-    fn nine_bindings_are_marked_unavailable() {
+    fn eight_bindings_are_marked_unavailable() {
         let keymap = Keymap::yazi();
         let marked: Vec<String> = keymap
             .bindings()
@@ -249,9 +248,6 @@ mod tests {
             .filter(|binding| unavailable(binding.action).is_some())
             .map(|binding| binding.label())
             .collect();
-        assert_eq!(
-            marked,
-            ["_", "<C-->", "A", "s", "S", "<C-s>", "z", "Z", ", r"]
-        );
+        assert_eq!(marked, ["_", "<C-->", "A", "s", "S", "<C-s>", "Z", ", r"]);
     }
 }

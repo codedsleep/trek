@@ -80,6 +80,88 @@ impl WhichKey {
     }
 }
 
+// ---- what every entry over the folder area shares ----
+
+/// Esc, Ctrl+C and Ctrl+[: the keys that close an entry without doing
+/// anything, as in Yazi's input.
+pub(super) fn is_cancel(key: gdk::Key, state: gdk::ModifierType) -> bool {
+    let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
+    let alt = state.contains(gdk::ModifierType::ALT_MASK);
+    key == gdk::Key::Escape || (ctrl && !alt && matches!(key, gdk::Key::c | gdk::Key::bracketleft))
+}
+
+/// The editing keys of Yazi's input in insert mode that an entry does not
+/// already have. Returns whether the key was one of them.
+pub(super) fn edit_key(entry: &gtk::Entry, key: gdk::Key, state: gdk::ModifierType) -> bool {
+    let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
+    let alt = state.contains(gdk::ModifierType::ALT_MASK);
+    let at = entry.position();
+    let text = entry.text();
+    let chars: Vec<char> = text.chars().collect();
+    let length = chars.len() as i32;
+    let word_back = || {
+        let mut to = at.clamp(0, length) as usize;
+        while to > 0 && !chars[to - 1].is_alphanumeric() {
+            to -= 1;
+        }
+        while to > 0 && chars[to - 1].is_alphanumeric() {
+            to -= 1;
+        }
+        to as i32
+    };
+    let word_forward = || {
+        let mut to = at.clamp(0, length) as usize;
+        while to < chars.len() && !chars[to].is_alphanumeric() {
+            to += 1;
+        }
+        while to < chars.len() && chars[to].is_alphanumeric() {
+            to += 1;
+        }
+        to as i32
+    };
+    match (key, ctrl, alt) {
+        (gdk::Key::a, true, false) => entry.set_position(0),
+        (gdk::Key::e, true, false) => entry.set_position(-1),
+        (gdk::Key::b, true, false) => entry.set_position((at - 1).max(0)),
+        (gdk::Key::f, true, false) => entry.set_position((at + 1).min(length)),
+        (gdk::Key::b, false, true) => entry.set_position(word_back()),
+        (gdk::Key::f, false, true) => entry.set_position(word_forward()),
+        (gdk::Key::h, true, false) if at > 0 => entry.delete_text(at - 1, at),
+        (gdk::Key::d, true, false) if at < length => entry.delete_text(at, at + 1),
+        (gdk::Key::u, true, false) => entry.delete_text(0, at),
+        (gdk::Key::k, true, false) => entry.delete_text(at, -1),
+        (gdk::Key::w, true, false) => entry.delete_text(word_back(), at),
+        (gdk::Key::d, false, true) => entry.delete_text(at, word_forward()),
+        (gdk::Key::h | gdk::Key::d, true, false) => {}
+        _ => return false,
+    }
+    true
+}
+
+/// Calls `gone` when the keyboard has left `entry` for another widget.
+pub(super) fn when_keyboard_leaves(entry: &gtk::Entry, gone: impl Fn() + 'static) {
+    let focus = gtk::EventControllerFocus::new();
+    let gone = Rc::new(gone);
+    let weak = entry.downgrade();
+    focus.connect_leave(move |_| {
+        // The window going to the background also "leaves", with the entry
+        // still the window's focus widget: that is not the keyboard going
+        // elsewhere.
+        let (weak, gone) = (weak.clone(), gone.clone());
+        glib::idle_add_local_once(move || {
+            let Some(entry) = weak.upgrade() else { return };
+            let still_here = entry
+                .root()
+                .and_then(|root| root.focus())
+                .is_some_and(|focus| focus.is_ancestor(&entry));
+            if !still_here {
+                gone();
+            }
+        });
+    });
+    entry.add_controller(focus);
+}
+
 // ---- input line ----
 
 /// Where the text cursor starts in an input line.
@@ -199,78 +281,23 @@ impl InputLine {
         entry.add_controller(keys);
         // Clicking elsewhere, or anything else that takes the keyboard away,
         // is a cancel: an input line nobody is typing into must not linger.
-        let focus = gtk::EventControllerFocus::new();
         let weak = Rc::downgrade(&self.0);
-        focus.connect_leave(move |_| {
-            // The window going to the background also "leaves", with the
-            // entry still the window's focus widget: that is not a cancel.
-            let weak = weak.clone();
-            glib::idle_add_local_once(move || {
-                let Some(this) = weak.upgrade().map(Self) else {
-                    return;
-                };
-                let entry = &this.0.entry;
-                let still_here = entry
-                    .root()
-                    .and_then(|root| root.focus())
-                    .is_some_and(|focus| focus.is_ancestor(entry));
-                if this.is_open() && !still_here {
-                    this.finish(true);
-                }
-            });
+        when_keyboard_leaves(entry, move || {
+            if let Some(this) = weak.upgrade().map(Self)
+                && this.is_open()
+            {
+                this.finish(true);
+            }
         });
-        entry.add_controller(focus);
     }
 
-    /// The keys of Yazi's input in insert mode that an entry does not
-    /// already have. Returns whether the key was one of them.
+    /// Esc and its like close the line; the rest is editing.
     fn key(&self, key: gdk::Key, state: gdk::ModifierType) -> bool {
-        let entry = &self.0.entry;
-        let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
-        let alt = state.contains(gdk::ModifierType::ALT_MASK);
-        let at = entry.position();
-        let text = entry.text();
-        let chars: Vec<char> = text.chars().collect();
-        let length = chars.len() as i32;
-        let word_back = || {
-            let mut to = at.clamp(0, length) as usize;
-            while to > 0 && !chars[to - 1].is_alphanumeric() {
-                to -= 1;
-            }
-            while to > 0 && chars[to - 1].is_alphanumeric() {
-                to -= 1;
-            }
-            to as i32
-        };
-        let word_forward = || {
-            let mut to = at.clamp(0, length) as usize;
-            while to < chars.len() && !chars[to].is_alphanumeric() {
-                to += 1;
-            }
-            while to < chars.len() && chars[to].is_alphanumeric() {
-                to += 1;
-            }
-            to as i32
-        };
-        match (key, ctrl, alt) {
-            (gdk::Key::Escape, _, _) | (gdk::Key::c, true, false) => self.finish(true),
-            (gdk::Key::bracketleft, true, false) => self.finish(true),
-            (gdk::Key::a, true, false) => entry.set_position(0),
-            (gdk::Key::e, true, false) => entry.set_position(-1),
-            (gdk::Key::b, true, false) => entry.set_position((at - 1).max(0)),
-            (gdk::Key::f, true, false) => entry.set_position((at + 1).min(length)),
-            (gdk::Key::b, false, true) => entry.set_position(word_back()),
-            (gdk::Key::f, false, true) => entry.set_position(word_forward()),
-            (gdk::Key::h, true, false) if at > 0 => entry.delete_text(at - 1, at),
-            (gdk::Key::d, true, false) if at < length => entry.delete_text(at, at + 1),
-            (gdk::Key::u, true, false) => entry.delete_text(0, at),
-            (gdk::Key::k, true, false) => entry.delete_text(at, -1),
-            (gdk::Key::w, true, false) => entry.delete_text(word_back(), at),
-            (gdk::Key::d, false, true) => entry.delete_text(at, word_forward()),
-            (gdk::Key::h | gdk::Key::d, true, false) => {}
-            _ => return false,
+        if is_cancel(key, state) {
+            self.finish(true);
+            return true;
         }
-        true
+        edit_key(&self.0.entry, key, state)
     }
 
     pub fn widget(&self) -> &gtk::Box {

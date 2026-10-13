@@ -2,6 +2,7 @@
 
 mod commands;
 mod fileops;
+mod finder;
 mod keys;
 mod open;
 mod pane;
@@ -54,6 +55,8 @@ struct Inner {
     input: prompt::InputLine,
     /// The yes/no question over the folder area.
     confirm: prompt::Confirm,
+    /// The fuzzy finder over the folder area.
+    finder: finder::Picker,
     /// The keys of a sequence that is not complete yet.
     pending: RefCell<Vec<tallboy_core::keymap::Key>>,
     /// A text entry has keyboard focus, so clipboard shortcuts belong to it.
@@ -160,16 +163,18 @@ impl MainWindow {
         toolbar
             .menu_button()
             .set_menu_model(app.gtk().menubar().as_ref());
-        // The which-key list, the input line and the question float over
-        // the folder area.
+        // The which-key list, the input line, the question and the fuzzy
+        // finder float over the folder area.
         let which_key = prompt::WhichKey::new();
         let input = prompt::InputLine::new();
         let confirm = prompt::Confirm::new();
+        let finder = finder::Picker::new();
         let overlay = gtk::Overlay::new();
         overlay.set_child(Some(&paned));
         overlay.add_overlay(which_key.widget());
         overlay.add_overlay(input.widget());
         overlay.add_overlay(confirm.widget());
+        overlay.add_overlay(finder.widget());
         overlay.set_vexpand(true);
         let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
         content.append(toolbar.widget());
@@ -193,6 +198,7 @@ impl MainWindow {
             which_key,
             input,
             confirm,
+            finder,
             pending: RefCell::default(),
             text_focus: Cell::new(false),
             refresh_queued: Cell::new(false),
@@ -295,13 +301,16 @@ impl MainWindow {
             }
         });
         self.watch_keys();
-        // When the input line closes the files have the keyboard again.
+        // When the input line or the finder closes the files have the
+        // keyboard again.
         let weak = self.downgrade();
-        inner.input.connect_closed(move || {
+        let to_files = move || {
             if let Some(tab) = weak.upgrade().and_then(|window| window.active_tab()) {
                 tab.grab_focus();
             }
-        });
+        };
+        inner.input.connect_closed(to_files.clone());
+        inner.finder.connect_closed(to_files);
 
         let first = inner.panes.borrow()[0].clone();
         self.attach_pane(&first);
@@ -483,6 +492,8 @@ impl MainWindow {
                     // A question was about the files of the tab it was
                     // asked in; "yes" must not arrive over another one.
                     window.0.confirm.answer(false);
+                    // And the finder was searching below its folder.
+                    window.0.finder.close();
                     window.clear_pending();
                     window.queue_refresh();
                 }
@@ -693,6 +704,7 @@ impl MainWindow {
         // Likewise when the folder under a question changes.
         if change == Change::Location {
             self.0.confirm.answer(false);
+            self.0.finder.close();
         }
         match change {
             // Many of these arrive while a key is held; they only move what
