@@ -406,6 +406,8 @@ Known at the start; agents append as they go.
 | `glib-unix` | 0.22.8 | `tallboy`; `SIGTERM`/`SIGINT`/`SIGHUP` sources. gtk-rs moved `unix_signal_add_local` out of `glib` in 0.22, as it did `DesktopAppInfo` into `gio-unix`; the alternative was hand-written `unsafe` `sigaction` |
 | `gio` feature `v2_80` | — | `tallboy`; `ApplicationCommandLine::printerr_literal`, the only way to print an option error on the *calling* terminal when the invocation is forwarded to a running instance |
 | `glib` feature `log` | — | `tallboy`; `GlibLogger`, the `log` → GLib bridge |
+| `nucleo` | 0.5.0 | `tallboy-fs`; the fuzzy finder (`z`). Helix's matcher: fzf's scoring and query syntax, matching on its own threads. Replaces nothing; the alternative was starting `fzf --filter` per keystroke, or a hand-written scorer on the main loop. Brings `rayon` and `parking_lot`. MPL-2.0 |
+| `ignore` | 0.4.33 | `tallboy-fs`; walks the tree for the finder as fd and ripgrep do, honouring `.gitignore` and `.ignore`. The alternative was `std::fs::read_dir` and a second, different reading of ignore files. Brings `globset`, `regex-automata`, `walkdir` |
 
 **Measurements** (filled in by tasks 1.1, 2.11, 3.11, 5.8, 5.15, 10.6). UI figures come from `scripts/agent/bench.sh`: release build, headless `cage` at 3840×2160 and scale 1.5 like the owner's monitor, timed from just before `exec`. They were not taken on the live GPU session, which agents must not use:
 

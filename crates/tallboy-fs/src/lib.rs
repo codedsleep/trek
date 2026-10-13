@@ -9,6 +9,7 @@ pub mod bookmarks;
 pub mod complete;
 pub mod dir_settings;
 pub mod filemanager1;
+pub mod finder;
 pub mod folder;
 pub mod guard;
 pub mod import;
