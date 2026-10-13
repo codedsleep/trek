@@ -95,6 +95,7 @@ impl App {
         gtk::Window::set_default_icon_name(crate::dialogs::help::ICON);
         actions::install_accels(gtk_app, true);
         gtk_app.set_menubar(Some(&menubar::build(&app.0.bookmarks_menu)));
+        prefer_dark();
         app.load_css();
         app.watch_places();
         crate::filemanager1::start(&app);
@@ -385,6 +386,14 @@ fn baseline() -> glib::ExitCode {
         window.present();
     });
     app.run_with_args::<&str>(&[])
+}
+
+/// Dark is the standard look. The theme and its colours stay the system's;
+/// only its dark variant is asked for, whatever the desktop prefers.
+fn prefer_dark() {
+    if let Some(settings) = gtk::Settings::default() {
+        settings.set_gtk_application_prefer_dark_theme(true);
+    }
 }
 
 /// Entry point after logging is set up.

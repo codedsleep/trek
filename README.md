@@ -238,8 +238,9 @@ Two things the lock does not cover and the review will not change:
   monitor's scale needs.
 - There is no desktop manager: tallboy does not draw a wallpaper or desktop
   icons, and `--desktop` says so.
-- It follows the GTK 4 theme and the light or dark preference of the system;
-  it has no colours of its own.
+- It is dark. It follows the GTK 4 theme and has no colours of its own, but
+  always asks for the theme's dark variant, whatever the desktop prefers.
+  `GTK_THEME=Adwaita:light` gives the light one for a single run.
 - X11 works through XWayland with `GDK_BACKEND=x11`, but Wayland is what it is
   used and tested on.
 
