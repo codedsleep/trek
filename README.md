@@ -1,0 +1,199 @@
+# tallboy
+
+A port of the [PCManFM](https://github.com/lxde/pcmanfm) file manager to Rust
+and GTK 4, for people who already know PCManFM: the same menus and shortcuts,
+the same four view modes, tabs, dual pane, Places and the directory tree, the
+trash can, volume handling and dialogs.
+
+Based on PCManFM by Hong Jen Yee (PCMan) and Andriy Grytsenko (LStranger), and
+on their libfm. The reference is PCManFM 1.4.0 with libfm 1.4.1.
+Licensed GPL-2.0-or-later, as they are; see `COPYING`.
+
+> **This build is locked.** Until its review is finished it changes files only
+> inside its test folders. Read [The safety lock](#the-safety-lock) before
+> pointing it at anything you care about.
+
+## What it does
+
+- **Browsing.** Icon, thumbnail, compact and detailed-list views; sorting by
+  name, date, size, type or extension, with folders first; hidden files; a
+  filter; zoom; view settings remembered per folder; type-ahead search.
+- **Getting around.** Tabs; dual-pane mode (`F3`, `F6` moves between panes); a
+  location entry with completion or breadcrumb buttons; back, forward and
+  history; bookmarks shared with GTK file choosers.
+- **Side pane.** Places with devices and bookmarks, or a directory tree.
+- **Files.** Copy, move, link, rename, create, trash, restore and delete, with
+  a progress window that can pause and cancel, conflict questions and error
+  handling; cut, copy and paste that other file managers understand;
+  drag and drop with Ctrl, Shift and an ask menu.
+- **Opening.** Default applications, Open With, the executable-file question,
+  a terminal in the current folder, Run a Command.
+- **Volumes and remote places.** Mount, unmount and eject; automount and the
+  autorun question for inserted media; Connect to Server for SSH, FTP, WebDAV
+  and Windows shares through GVFS.
+- **Properties** with permissions, and **Preferences** that apply at once.
+- **Thumbnails** for images, in the cache other programs share.
+- **Integration.** One instance per profile, daemon mode, the
+  `org.freedesktop.FileManager1` service ("Show in folder"), and an importer
+  for PCManFM's settings (`tallboy --import-pcmanfm`).
+
+`man tallboy` lists the command-line options.
+
+## Building
+
+Fedora packages:
+
+    sudo dnf install gtk4-devel glib2-devel gdk-pixbuf2-devel gcc pkgconf-pkg-config \
+        rust cargo rustfmt clippy
+
+At run time it wants `gvfs` with the backends you use (`gvfs-smb`, `gvfs-mtp`,
+`gvfs-fuse` and so on), `udisks2`, `shared-mime-info` and an icon theme.
+
+    cargo build --release -p tallboy     # the binary is target/release/tallboy
+    scripts/check.sh                     # format, lints, tests, a start-up smoke test
+
+Rust 1.92 or later; GTK 4.14 or later (developed against 4.22).
+
+### Installing
+
+    scripts/install.sh                   # into ~/.local, beside PCManFM
+    scripts/install.sh --set-default     # also open folders with tallboy
+    scripts/install.sh --uninstall
+
+A plain install adds the binary, a launcher, the icon and the man page and
+changes no default: folders keep opening with whatever opened them before.
+`--set-default` makes tallboy the handler for folders, installs the D-Bus
+service file that lets other programs ask it to show a file, and prints the
+command that undoes the first of those.
+
+### Trying it without touching your settings
+
+    scripts/mkfixture.sh                 # test folders under ~/.cache/tallboy-fixture
+    scripts/dev-run.sh                   # tallboy on the fixture, with its own settings
+
+`dev-run.sh` uses its own D-Bus session and its own configuration, cache and
+data folders under `~/.cache/tallboy-dev`, so its bookmarks, trash can and
+default applications are not yours.
+
+### Coming from PCManFM
+
+    tallboy --import-pcmanfm
+
+reads `~/.config/pcmanfm/default/pcmanfm.conf` and `~/.config/libfm/libfm.conf`,
+takes over every setting tallboy also has, and prints what it imported and
+what it left. It changes neither file and is never run for you.
+
+## The safety lock
+
+A file manager deletes things. Until the review in `.planning/SCOPE.md`
+Phase 10 has been signed off, every operation that changes files — copy, move,
+link, trash, delete, rename, create, changing permissions — is refused unless
+all of its sources and its destination lie inside:
+
+- the test fixture, `~/.cache/tallboy-fixture`;
+- the system's temporary directory (`/tmp`) and the build's own `target/tmp`,
+  which the tests use;
+- any folder named in `TALLBOY_ALLOW_ROOTS` (`scripts/dev-run.sh` names its
+  own data folder this way).
+
+Everywhere else tallboy browses, opens files and mounts volumes as usual, and
+tells you why when it refuses a change.
+
+To let it work in one more place, name it when starting — several are
+separated by semicolons, and a remote folder is given as a URI:
+
+    TALLBOY_ALLOW_ROOTS=/run/media/$USER/STICK tallboy
+    TALLBOY_ALLOW_ROOTS='/mnt/scratch;smb://nas/share/tmp' tallboy
+
+The trash can is only usable when tallboy's data folder is itself inside an
+allowed folder, as it is under `scripts/dev-run.sh`.
+
+**Unlocking.** The lock is not a setting. It is removed from the source when
+the review is signed off, and the release that follows (`v1.0.0`) has none.
+The code does have an override for that review, `TALLBOY_UNLOCKED=1`, which
+switches every check off; using it before the sign-off means trusting an
+unreviewed copy and delete engine with your files.
+
+Two things the lock does not cover and the review will not change:
+
+- **Recursive operations follow paths, not open folders.** While tallboy is
+  deleting or copying a folder tree, another program that swaps a folder in
+  that tree for a symbolic link can redirect the rest of the operation. PCManFM
+  and most file managers share this. Do not run a recursive delete in a folder
+  that another user or an untrusted program can write to.
+- **A crash or kill in the middle of a copy** can leave a hidden file named
+  `.tallboy-copy-…` beside the destination. It is safe to delete.
+
+## Hyprland and Wayland notes
+
+- The application id is `io.github.codedsleep.Tallboy` (with `--profile NAME`:
+  `io.github.codedsleep.Tallboy.p_NAME`), for window rules. Dialogs are
+  transient windows and float without a rule. A key binding:
+  `bind = $mainMod, E, exec, tallboy`.
+- An application started from tallboy is handed an activation token, so its
+  window takes the focus.
+- **The clipboard is the compositor's.** Files you cut or copy stay on the
+  clipboard only while a tallboy window exists. Close the last window before
+  pasting and the cut or copy is gone, unless a clipboard manager is running.
+  This is true of every GTK 4 program.
+- **Modifier keys during a drag.** On Wayland the program you drop on decides
+  between copy, move and link. tallboy reads Ctrl and Shift itself, so they
+  work for drags inside tallboy and for drops onto tallboy while its window
+  has the keyboard; other programs may ignore them.
+- Mounting an internal disk needs a polkit agent running in the session.
+  "Remember forever" for a network password needs a secret service
+  (GNOME Keyring, KeePassXC's, or similar) on the session bus; without one a
+  password is kept for the session at most.
+- Fractional scaling is handled: thumbnails are requested at the size the
+  monitor's scale needs.
+- There is no desktop manager: tallboy does not draw a wallpaper or desktop
+  icons, and `--desktop` says so.
+- It follows the GTK 4 theme and the light or dark preference of the system;
+  it has no colours of its own.
+- X11 works through XWayland with `GDK_BACKEND=x11`, but Wayland is what it is
+  used and tested on.
+
+## Differences from PCManFM
+
+Everything not listed here is meant to behave as PCManFM 1.4.0 does. This is
+the list kept in `.planning/SCOPE.md` §10, in the same order.
+
+1. Find Files, templates, archivers, custom actions and the applications folder are absent; their menu items are disabled or omitted
+2. No desktop manager; its command-line options report that it is not built
+3. `--role` accepted with no effect
+4. `admin://` rejected
+5. Launchers and scripts on filesystems with synthetic execute bits are never trusted or offered for execution
+6. Autorun choice cannot be remembered for `x-content/unix-software`
+7. No external thumbnailers
+8. Owns `org.freedesktop.FileManager1`
+9. Recursive delete stops and asks at a mount point
+10. Follows the system GTK 4 theme, which is not the GTK 3 theme PCManFM uses
+11. Bookmarks ▸ Edit Bookmarks… exists; PCManFM 1.4.0 edits bookmarks only from the side pane
+12. Compact view columns are all the same width and long names are ellipsised; upstream fits each column to its longest name. GTK 4's `GridView` has uniform cells
+13. The selection highlight covers the whole grid cell, as GTK 4 themes draw it, not only the icon and name
+14. A press on the padding around an item selects it on release, and a drag from there starts a rubber band; upstream deselects and rubber-bands from the gaps only
+15. During a drag, Ctrl, Shift and Ctrl+Shift are read from the keyboard by the destination. For a drag that starts in another program they are only seen while tallboy's window has the keyboard, and a link can only be made by tallboy as the destination. Wayland has no link action and sources do not narrow their offer
+16. Preparation errors stop the whole job; an execution error on one child ends that top-level folder’s copy, move, delete or attribute change. Skip abandons its remaining children; Retry repeats completed entries and conflicts. Upstream asks per file
+17. A kill or crash in mid-copy can leave a hidden `.tallboy-copy-*` file beside the destination; upstream leaves the partial destination file instead
+18. A folder dropped on the empty part of Places becomes a bookmark. Dropping exactly *between* two bookmarks is not told apart from dropping *on* one, which puts the files into that folder; files cannot be dropped on the Trash Can row
+19. The directory tree shows a hidden folder that lies on the way to the current folder even when hidden files are off, so the current folder can always be seen in it
+20. Owner and group names in Properties are looked up in `/etc/passwd` and `/etc/group`; an account known only to a directory service must be given as a number
+21. When a volume is unmounted and `close_on_unmount` is on, a window's last tab goes Home instead of closing the window
+22. Preferences has no controls for templates, archivers, the Applications place or the desktop, which v1 leaves out; icon sizes are chosen from a fixed list of sizes
+23. `ShowItems` of `org.freedesktop.FileManager1` selects the first item asked for in each folder, not all of them
+24. Closing the last tab of one of two panes leaves dual-pane mode and keeps the other pane's tabs
+25. Passwords embedded in a location’s userinfo are rejected; credentials must be entered through the mount prompt
+26. Recursive permission changes prepare the tree and visit children before parents; an inaccessible subtree cannot be repaired by granting access recursively
+27. A listing error after an initial batch leaves the partial view in Loading; partial-result error presentation awaits an owner decision
+
+## Layout of the source
+
+| Crate | What it is |
+|---|---|
+| `crates/tallboy-core` | Pure logic: locations, sorting, naming, the settings model, command-line parsing. No I/O. |
+| `crates/tallboy-fs` | Everything that touches files through GIO: folder listing and monitoring, the job engine and its guard, trash, volumes, thumbnails, bookmarks. No GTK. |
+| `crates/tallboy` | The GTK 4 application. |
+
+`.planning/` holds the specification (`PROMPT.md`), the decisions
+(`DISCOVERY.md`), the plan and its log (`SCOPE.md`), and what was checked and
+how (`QA.md`).

@@ -1,0 +1,82 @@
+/* Only what the theme cannot know. No colours here: tallboy follows the
+ * system GTK 4 theme (DISCOVERY D20). */
+
+.hidden-item {
+  opacity: 0.5;
+}
+
+.statusbar {
+  padding: 2px 8px;
+}
+
+.folder-view > child {
+  padding: 4px 2px;
+}
+
+.compact-view > child {
+  padding: 1px 6px 1px 2px;
+}
+
+.dialog-body {
+  padding: 16px;
+}
+
+.toolbar {
+  padding: 2px 4px;
+}
+
+.pathbar-crumbs button {
+  padding: 2px 8px;
+}
+
+.tab-label button {
+  padding: 0;
+  min-width: 20px;
+  min-height: 20px;
+}
+
+/* The symbolic-link emblem overlaps the bottom of the icon before it. */
+.item-emblem-16 {
+  margin-top: -16px;
+}
+
+.item-emblem-8 {
+  margin-top: -8px;
+}
+
+.item-emblem-side {
+  margin-left: -12px;
+}
+
+.type-ahead {
+  margin: 8px 20px;
+}
+
+.drag-count {
+  padding: 0 6px;
+  border-radius: 9px;
+  font-weight: bold;
+}
+
+.side-pane > menubutton {
+  margin: 2px;
+}
+
+/* Dual-pane mode: mark the pane that commands act on. The colour is the
+ * theme's own selection colour. */
+.panes.dual .pane {
+  border-top: 2px solid transparent;
+}
+
+.panes.dual .pane.active-pane {
+  border-top-color: @theme_selected_bg_color;
+}
+
+/* Preferences pages. */
+.prefs-page {
+  padding: 12px 16px;
+}
+
+.prefs-page > .heading:not(:first-child) {
+  margin-top: 10px;
+}

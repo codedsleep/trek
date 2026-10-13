@@ -1,0 +1,18 @@
+[package]
+name = "tallboy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tallboy-core.workspace = true
+tallboy-fs.workspace = true
+gtk.workspace = true
+glib = { workspace = true, features = ["log"] }
+gio = { workspace = true, features = ["v2_80"] }
+glib-unix = "=0.22.8"
+log.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
