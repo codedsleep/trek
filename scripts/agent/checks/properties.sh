@@ -15,7 +15,7 @@ check "Alt+Return opens File Properties" has "$(state)" 'dialogs=\["File Propert
 check "the name has the keyboard, base name selected" has "$(state)" 'toplevels=2'
 vin type "renamed"; vin key Return; settle 1
 check "changing the name renames the file on OK" test -f "$P/renamed.txt" -a ! -e "$P/a.txt"
-check "and the renamed file is selected" has "$(state)" 'names=\["renamed.txt"\]'
+check "and the cursor is on the renamed file" has "$(state)" 'cursor="renamed.txt"'
 
 echo "--- a folder: live count"
 vin move "$(col 0)" 145 click; act properties; settle 1.2; shot props-folder

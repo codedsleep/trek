@@ -12,7 +12,7 @@ check "Filesystem Root is not, by default" bash -c '! grep -q "Filesystem Root" 
 
 echo "--- bookmarks"
 act go-to "'$F/deep'"; settle 0.5
-vin key ctrl+d; settle 0.5; shot add-bookmark; vin key Return; settle 0.8
+act add-bookmark; settle 0.5; shot add-bookmark; vin key Return; settle 0.8
 check "Add to Bookmarks writes the shared GTK file" grep -q "file://$F/deep deep" "$B"
 check "and the row appears in Places" has "$(state)" 'places=\[[^]]*"deep"\]'
 check "the bookmark for the current folder is highlighted" bash -c '[[ "$1" != *"place_selected=-1"* ]]' _ "$(state)"

@@ -23,13 +23,13 @@ echo "--- ShowItems with no window open"
 fm ShowItems "['file://$F/deep/level-00/level-01/item.txt']" >/dev/null; settle 1.5; shot fm1-item
 S=$(state)
 check "a window opens on the item's folder" has "$S" "location=file://$F/deep/level-00/level-01 "
-check "with the item selected" has "$S" 'selected=1 names=\["item.txt"\]'
+check "with the cursor on the item" has "$S" 'cursor="item.txt"'
 
 echo "--- ShowItems in a large folder: the item is scrolled to"
 fm ShowItems "['file://$F/big/file-25000.txt']" >/dev/null; settle 3; shot fm1-big
 S=$(state)
 check "a tab opens in the same window" has "$S" 'tabs=2 '
-check "the item is selected" has "$S" 'selected=1 names=\["file-25000.txt"\]'
+check "the cursor is on the item" has "$S" 'cursor="file-25000.txt"'
 check "and the view has scrolled to it" test "$(echo "$S" | grep -o 'scroll=[0-9]*' | cut -d= -f2)" -gt 1000
 
 echo "--- ShowFolders"

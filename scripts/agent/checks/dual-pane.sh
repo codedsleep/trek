@@ -21,10 +21,10 @@ check "clicking back activates the first, still on left" has "$(state)" "active_
 check "and its folder was not changed by the other pane" has "$(loc)" "location=file://$P/left"
 
 echo "--- copy in one pane, F6, paste in the other"
-vin key ctrl+a; vin key ctrl+c; settle 0.3
+vin key ctrl+a; vin type "y"; settle 0.3
 vin key F6; settle 0.4
 check "F6 moves to the second pane" has "$(state)" 'active_pane=1'
-vin key ctrl+v; settle 1.2; shot dual-copied
+vin type "p"; settle 1.2; shot dual-copied
 check "paste lands in the second pane's folder" test -f "$P/right/one.txt" -a -f "$P/right/two.txt"
 check "and the originals stay" test -f "$P/left/one.txt"
 vin key F6; settle 0.4

@@ -44,7 +44,7 @@ echo "--- history and breadcrumbs"
 act pathbar-mode "'buttons'"; settle 0.4
 act go-to "'$F/deep/level-00/level-01/level-02'"; settle 0.4; act up; settle 0.4
 check "Up goes to the parent" at /deep/level-00/level-01
-check "and selects the folder left" has "$(state)" 'names=\["level-02"\]'
+check "with the cursor on the folder left" has "$(state)" 'cursor="level-02"'
 act back; settle 0.3
 check "Back returns" at /deep/level-00/level-01/level-02
 act history-go "'0'"; settle 0.4

@@ -30,6 +30,12 @@ run_session() {
     return "$status"
 }
 
+# The layout the pointer checks were written against: icon view, side pane,
+# toolbar buttons and menu bar shown, no parent or preview column. All of it
+# is still on offer, so these checks keep it working; `vim` and `navigation`
+# run with the defaults.
+classic='[ui]\nview_mode=icon\nside_pane_mode=places\nmiller_parent=0\nmiller_preview=0\nshow_menubar=1\npathbar_mode_buttons=0\ntoolbar=newtab;navigation;home;\n'
+
 # Starts the profile from defaults, or from the given key-file text.
 seed() {
     mkdir -p "$(dirname "$conf")"
@@ -41,37 +47,44 @@ seed() {
 one() {
     local name=$1
     case $name in
-        navigation) seed; run_session -- "$fixture/deep" <"$checks/navigation.sh" ;;
+        vim) seed; run_session --size 1400x800 --timeout 240 -- "$fixture/names" <"$checks/vim.sh" ;;
+        navigation)
+            seed '[ui]\npathbar_mode_buttons=0\n'
+            run_session --keep -- "$fixture/deep" <"$checks/navigation.sh"
+            ;;
         opening)
-            seed
-            run_session --env "TERMINAL=$agent/opening/bin/fake-term" -- "$fixture/names" <"$checks/opening.sh"
+            seed "$classic"
+            run_session --keep --env "TERMINAL=$agent/opening/bin/fake-term" -- "$fixture/names" <"$checks/opening.sh"
             ;;
         single-click)
-            seed '[config]\nsingle_click=1\nauto_selection_delay=300\n'
+            seed "[config]\nsingle_click=1\nauto_selection_delay=300\n$classic"
             run_session --keep -- "$fixture" <"$checks/single-click.sh"
             ;;
         dnd-ask)
-            seed '[config]\ndrop_default_action=ask\n'
+            seed "[config]\ndrop_default_action=ask\n$classic"
             run_session --keep -- "$fixture/names" <"$checks/dnd-ask.sh"
             ;;
-        progress) seed; run_session --release -- "$fixture" <"$checks/progress.sh" ;;
-        prefs) seed; run_session --size 1280x900 --timeout 120 -- "$fixture/names" <"$checks/prefs.sh" ;;
+        progress) seed "$classic"; run_session --keep --release -- "$fixture" <"$checks/progress.sh" ;;
+        prefs)
+            seed "$classic"
+            run_session --keep --size 1280x900 --timeout 120 -- "$fixture/names" <"$checks/prefs.sh"
+            ;;
         leaks|session)
-            seed
-            run_session --env TALLBOY_TRACE=1 -- --daemon-mode "$fixture/deep" <"$checks/$name.sh"
+            seed "$classic"
+            run_session --keep --env TALLBOY_TRACE=1 -- --daemon-mode "$fixture/deep" <"$checks/$name.sh"
             ;;
         filemanager1)
             seed
             run_session --env TALLBOY_FILEMANAGER1=1 -- --daemon-mode <"$checks/filemanager1.sh"
             EXPECT_OWNED=0 run_session -- --daemon-mode <"$checks/filemanager1.sh"
             ;;
-        *) seed; run_session -- "$fixture/names" <"$checks/$name.sh" ;;
+        *) seed "$classic"; run_session --keep -- "$fixture/names" <"$checks/$name.sh" ;;
     esac
 }
 
 names=("$@")
 if [[ ${#names[@]} -eq 0 ]]; then
-    names=(navigation opening single-click fileops dnd dnd-ask progress menus sidepane
+    names=(vim navigation opening single-click fileops dnd dnd-ask progress menus sidepane
         properties dual-pane prefs leaks filemanager1 session)
 fi
 failed=0

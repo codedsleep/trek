@@ -4,10 +4,10 @@
 F=$HOME/.cache/tallboy-fixture
 P=$(mktemp -d "$HOME/.cache/tallboy-agent/progress-XXXXXX")
 count() { find "$P/big" -type f 2>/dev/null | wc -l; }
-pick() { vin key Escape; settle 0.2; vin type "$1"; settle 0.4; vin key Escape; settle 0.3; }
+pick() { vin key Escape; settle 0.2; vin type "/"; vin type "$1"; settle 0.3; vin key Return; settle 0.3; }
 settle 0.6
-pick big; vin key ctrl+c; settle 0.3
-act go-to "'$P'"; settle 0.6; vin key ctrl+v; settle 1.5
+pick big; vin type "y"; settle 0.3
+act go-to "'$P'"; settle 0.6; vin type "p"; settle 1.5
 shot progress
 check "the progress window is up after half a second" has "$(state)" 'dialogs=\[.*"Copying files"'
 started=$(date +%s%N); state >/dev/null; elapsed=$(( ($(date +%s%N) - started) / 1000000 ))

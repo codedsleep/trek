@@ -145,6 +145,8 @@ static int char_key(char c, int *shift) {
     case '\'': return 40;
     case '[': return 26;
     case ']': return 27;
+    case '{': *shift = 1; return 26;
+    case '}': *shift = 1; return 27;
     case '\n': return 28;
     default: return -1;
     }

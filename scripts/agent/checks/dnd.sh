@@ -41,8 +41,8 @@ echo "--- drops that must do nothing"
 vin move "$(col 2)" 145 down sleep 250 drag 700 500 sleep 400 up; settle 1
 check "a move onto the folder the file is already in does nothing" test -f "$D/e.txt"
 check "and starts no job" has "$(state)" 'dialogs=\[\]'
-vin move "$(col 0)" 145 click; vin key ctrl+c; settle 0.3
-vin move "$(col 0)" 145 dblclick; settle 0.8; vin key ctrl+v; settle 0.8
+vin move "$(col 0)" 145 click; vin type "y"; settle 0.3
+vin move "$(col 0)" 145 dblclick; settle 0.8; vin type "p"; settle 0.8
 check "a folder pasted into itself is refused" has "$(state)" 'dialogs=\["' 
 vin key Return; settle 0.4
 check "and nothing was copied" test ! -e "$D/dest1/dest1"
@@ -50,7 +50,7 @@ act up; settle 0.6
 
 echo "--- drop on a tab label"
 act new-tab; settle 0.5; act go-to "'$D/dest2'"; settle 0.6
-vin key alt+1; settle 0.5
+vin type "1"; settle 0.5
 check "the first tab is showing" has "$(state)" "location=file://$D "
 shot tabs-before
 # The second tab's label is the right half of the tab bar. One vinput call
