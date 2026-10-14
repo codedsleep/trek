@@ -1,4 +1,4 @@
-# QA.md — `tallboy`
+# QA.md — `trek`
 
 What was checked, how, and what is left for the owner. One section per Goal B phase.
 
@@ -15,18 +15,18 @@ Agents cannot see the owner's monitors, other applications, real devices or the 
 ## Running it
 
 ```sh
-scripts/dev-run.sh              # opens ~/.cache/tallboy-fixture on the live display
+scripts/dev-run.sh              # opens ~/.cache/trek-fixture on the live display
 scripts/dev-run.sh ~/Documents  # browsing anywhere is fine; it is read-only outside the fixture
 scripts/dev-run.sh --reset      # start again with an empty dev profile
 ```
 
-`dev-run.sh` uses its own D-Bus session, its own config, trash and thumbnail cache under `~/.cache/tallboy-dev`, and the profile `dev`. Your real bookmarks, trash and default applications are not touched, and are not shown.
+`dev-run.sh` uses its own D-Bus session, its own config, trash and thumbnail cache under `~/.cache/trek-dev`, and the profile `dev`. Your real bookmarks, trash and default applications are not touched, and are not shown.
 
 The build is **locked** until the Phase 10 sign-off: copy, move, delete, trash, rename and create are refused outside the fixture. Browsing and opening files work everywhere.
 
-The reference is the installed PCManFM 1.4.0. For English labels start it with `LANGUAGE=C LC_ALL=C pcmanfm`; your locale shows "Rubbish Bin" where tallboy says "Trash Can".
+The reference is the installed PCManFM 1.4.0. For English labels start it with `LANGUAGE=C LC_ALL=C pcmanfm`; your locale shows "Rubbish Bin" where trek says "Trash Can".
 
-If tallboy crashes, the reason is in `~/.cache/tallboy-dev/state/tallboy/crash.log`.
+If trek crashes, the reason is in `~/.cache/trek-dev/state/trek/crash.log`.
 
 ---
 
@@ -38,11 +38,11 @@ If tallboy crashes, the reason is in `~/.cache/tallboy-dev/state/tallboy/crash.l
 |---|---|---|
 | Menu bar: every label, order, separator and accelerator of File, Edit, View (with Sort Files, Folder View Mode, Toolbar, Path Bar, Side Pane), Bookmarks, Go, Tools, Help | agent: screenshots of every menu and submenu beside the same shots of PCManFM 1.4.0 | Same, except the deviations below |
 | Find Files… and Go ▸ Applications are present but greyed out | agent: screenshot | Pass |
-| A second `tallboy` invocation is handled by the running one | agent: second invocation adds a tab, exit status 0 | Pass |
+| A second `trek` invocation is handled by the running one | agent: second invocation adds a tab, exit status 0 | Pass |
 | `--profile other` is a separate instance with its own config directory | agent | Pass |
 | `--desktop`, `--find-files`, an unknown option | agent: message on the caller's terminal, exit status 2 | Pass |
 | `SIGTERM` saves settings and exits with status 0 | agent | Pass |
-| Hand-edited `tallboy.conf` (`show_hidden`, `sort`, `show_statusbar`, `side_pane_mode`) changes the start-up state; an unknown key survives a save | agent | Pass |
+| Hand-edited `trek.conf` (`show_hidden`, `sort`, `show_statusbar`, `side_pane_mode`) changes the start-up state; an unknown key survives a save | agent | Pass |
 | Browsing: double-click and Enter open a folder, Backspace goes to the parent and selects the folder left | agent: pointer and keyboard input, state read back | Pass |
 | Status bar: item count, hidden count, selected file, free space | agent: screenshot | Pass |
 | "Folder is empty"; unreadable folder shows "Permission denied." with Retry | agent: `fixture/empty`, `fixture/perm/unreadable` | Pass |
@@ -54,7 +54,7 @@ If tallboy crashes, the reason is in `~/.cache/tallboy-dev/state/tallboy/crash.l
 
 **Menu deviations from the installed PCManFM, all intended**
 
-- Bookmarks ▸ Edit Bookmarks… exists in tallboy (PROMPT §8.2); 1.4.0 edits bookmarks only from the side pane.
+- Bookmarks ▸ Edit Bookmarks… exists in trek (PROMPT §8.2); 1.4.0 edits bookmarks only from the side pane.
 - Create New… lists only Folder and Empty File; templates are a later version.
 - Tools ▸ Find Files… and Go ▸ Applications are greyed out; both are later versions.
 
@@ -68,10 +68,10 @@ Run `scripts/dev-run.sh`. The side pane is empty and there is no toolbar yet; bo
 - [ ] **Hidden files.** In `names`, `Ctrl+H` shows `.hidden` and `backup~`; the status bar count changes from "6 item(s) (2 hidden)" to "8 item(s)".
 - [ ] **Sorting.** View ▸ Sort Files ▸ Descending reverses the order with folders still first.
 - [ ] **Big folder.** Open `big` (50,000 files). It fills in without freezing, and scrolling with the wheel and the scroll bar stays smooth.
-- [ ] **Live updates.** With `live` open, run `touch ~/.cache/tallboy-fixture/live/x` in a terminal: the file appears. Delete it: it goes.
+- [ ] **Live updates.** With `live` open, run `touch ~/.cache/trek-fixture/live/x` in a terminal: the file appears. Delete it: it goes.
 - [ ] **Errors.** `perm/unreadable` shows "Permission denied." and a Retry button.
 - [ ] **Window state.** Resize the window, drag the splitter, close, start again: size and splitter are as you left them.
-- [ ] **Look.** tallboy has the colours of your GTK theme (NordArc) on GTK 4's own widget shapes, so it is close to PCManFM without matching it (SCOPE §12 "Theme"). Say so if anything is unreadable or has the wrong colour rather than merely a different shape.
+- [ ] **Look.** trek has the colours of your GTK theme (NordArc) on GTK 4's own widget shapes, so it is close to PCManFM without matching it (SCOPE §12 "Theme"). Say so if anything is unreadable or has the wrong colour rather than merely a different shape.
 
 ---
 
@@ -101,7 +101,7 @@ The scripts are in `scripts/agent/checks/`; each prints PASS or FAIL per line an
 | No default application leads to Open With; Esc cancels; choosing with "set as default" changes what `gio mime` reports | agent: `opening.sh` | Pass |
 | Script and binary prompts use upstream's wording; Cancel runs nothing; Execute runs the script | agent: `opening.sh`, screenshot | Pass |
 | A launcher that is not executable asks before starting | agent: `opening.sh` | Pass |
-| `tallboy file dir` with relative paths from a second invocation; `-n` | agent: `opening.sh` | Pass |
+| `trek file dir` with relative paths from a second invocation; `-n` | agent: `opening.sh` | Pass |
 | `F4` starts the terminal in the folder; Run a Command runs there; a bad command shows its error in the dialog | agent: `opening.sh` | Pass |
 | Daemon mode stays without a window, serves later invocations, survives its last window closing, ends on `SIGTERM`; without it the process ends with its last window | agent | Pass |
 | The large-folder budgets after this phase's additions | agent: `scripts/agent/bench.sh` | See SCOPE §11 |
@@ -125,7 +125,7 @@ The scripts are in `scripts/agent/checks/`; each prints PASS or FAIL per line an
 - [ ] **Open With.** Open a file of a type with no default: pick an application, tick "Set selected application as default", then double-click the file again.
 - [ ] **Executables.** `chmod +x` a small script in the fixture and double-click it: the question matches PCManFM's. Cancel does nothing.
 - [ ] **Terminal.** `F4` opens kitty in the current folder.
-- [ ] **Command line.** From a terminal inside the fixture, with tallboy already running through `dev-run.sh`: `scripts/dev-run.sh names` opens `names` as a new tab.
+- [ ] **Command line.** From a terminal inside the fixture, with trek already running through `dev-run.sh`: `scripts/dev-run.sh names` opens `names` as a new tab.
 
 ---
 
@@ -139,7 +139,7 @@ Everything here happens inside the allowed folders. The build is locked: outside
 |---|---|---|
 | Data-loss review of the job engine and guard (task 7.1) | review; two defects fixed with tests; write-up in `HANDOFF-B.md` §2 | Done |
 | A file can never replace a folder, also after "overwrite all" | test: `a_file_never_replaces_a_folder` | Pass |
-| Empty Trash and Remove work on a trashed folder with contents | test with `TALLBOY_TEST_GVFS=1`: `gvfs_trash_subprocess` | Pass |
+| Empty Trash and Remove work on a trashed folder with contents | test with `TREK_TEST_GVFS=1`: `gvfs_trash_subprocess` | Pass |
 | Create New Folder / Empty File: the name asked for, a taken name made unique, an invalid name refused in the dialog, the new item selected | agent: `fileops.sh` | Pass |
 | Rename: base name selected, extension kept, renamed item selected | agent: `fileops.sh`, screenshot | Pass |
 | Copy and Paste into the same folder (auto-renamed copy) and into another; Cut and Paste moves and empties the clipboard | agent: `fileops.sh` | Pass |
@@ -157,20 +157,20 @@ Everything here happens inside the allowed folders. The build is locked: outside
 | A drag resting on a tab label switches tabs; dropping there moves into that tab's folder | agent: `dnd.sh` | Pass |
 | `drop_default_action=ask`: menu at the drop point, Move Here moves, a modifier skips the menu | agent: `dnd-ask.sh`, screenshot | Pass |
 
-**Not checked by an agent:** anything between tallboy and another program (clipboard and drag in both directions); Create Link…, Move to… and Copy to… past the point where the system folder chooser opens; the drag icon and its count badge; trash on removable media (`no_usb_trash`); the mount-point question.
+**Not checked by an agent:** anything between trek and another program (clipboard and drag in both directions); Create Link…, Move to… and Copy to… past the point where the system folder chooser opens; the drag icon and its count badge; trash on removable media (`no_usb_trash`); the mount-point question.
 
 ### Owner checkpoint 3
 
-Work in `~/.cache/tallboy-fixture` (`scripts/dev-run.sh` opens it). `scripts/mkfixture.sh --clean && scripts/mkfixture.sh` rebuilds it afterwards.
+Work in `~/.cache/trek-fixture` (`scripts/dev-run.sh` opens it). `scripts/mkfixture.sh --clean && scripts/mkfixture.sh` rebuilds it afterwards.
 
 - [ ] **Copy, move, delete.** Copy a folder with `Ctrl+C` / `Ctrl+V`, move one with `Ctrl+X` / `Ctrl+V`, rename with `F2`, trash with Delete, remove with Shift+Delete. Each confirmation reads as PCManFM's does.
 - [ ] **Progress.** Copy `big` into `empty`. The progress window appears, shows file, speed and time remaining; Pause, Resume and Cancel work; the main window stays usable.
 - [ ] **Conflicts.** Paste the same file twice into one folder: Overwrite, Skip, Rename and "Apply this option to all existing files" do what they say.
 - [ ] **Trash.** Trashed files appear under Go ▸ Trash Can (the dev session's own trash). Restore and Empty Trash Can are Phase 8.
 - [ ] **Locked build.** Browse to `~/Documents` and press `Ctrl+Shift+N`: the dialog explains the lock and nothing is created.
-- [ ] **Clipboard with PCManFM, both ways.** Copy in PCManFM, paste in tallboy (into the fixture); cut in PCManFM, paste in tallboy. Then copy in tallboy and paste in PCManFM. *Paste into PCManFM is PCManFM's operation and is not locked: use a scratch folder.*
-- [ ] **Drag and drop with PCManFM, both ways.** Drag from PCManFM onto the tallboy view and onto a folder in it; drag from tallboy into PCManFM.
-- [ ] **Modifiers.** Inside tallboy: plain drag onto a folder moves, Ctrl copies, Ctrl+Shift links. From another program the modifier keys are only seen while tallboy has the keyboard (a Wayland limit, SCOPE §10 deviation 15).
+- [ ] **Clipboard with PCManFM, both ways.** Copy in PCManFM, paste in trek (into the fixture); cut in PCManFM, paste in trek. Then copy in trek and paste in PCManFM. *Paste into PCManFM is PCManFM's operation and is not locked: use a scratch folder.*
+- [ ] **Drag and drop with PCManFM, both ways.** Drag from PCManFM onto the trek view and onto a folder in it; drag from trek into PCManFM.
+- [ ] **Modifiers.** Inside trek: plain drag onto a folder moves, Ctrl copies, Ctrl+Shift links. From another program the modifier keys are only seen while trek has the keyboard (a Wayland limit, SCOPE §10 deviation 15).
 - [ ] **Dual-window drag.** `Ctrl+N`, then drag between the two windows.
 - [ ] **Tab drop.** With two tabs, drag a file onto the other tab's label and hold: the tab comes forward; drop.
 - [ ] **Chooser commands.** Edit ▸ Copy to…, Move to… and Create Link… open a folder chooser and act on the choice.
@@ -204,17 +204,17 @@ Work in `~/.cache/tallboy-fixture` (`scripts/dev-run.sh` opens it). `scripts/mkf
 
 ### Owner checkpoint 4
 
-Run `TALLBOY_ALLOW_ROOTS=/run/media/$USER/<stick> scripts/dev-run.sh` for the USB steps. **Internal disks: mount and unmount only — do not write to them.**
+Run `TREK_ALLOW_ROOTS=/run/media/$USER/<stick> scripts/dev-run.sh` for the USB steps. **Internal disks: mount and unmount only — do not write to them.**
 
 - [ ] **Context menus.** Right-click a file, a folder, several files and empty space; compare each with PCManFM's menu. Templates, archiver items and custom actions are absent on purpose.
 - [ ] **Places.** Home, Desktop, Trash Can and Devices are listed; the current folder's row is highlighted. Right-click a row for its menu.
-- [ ] **Bookmarks.** `Ctrl+D` adds one. Add another in a GTK file chooser (for example `gtk4-demo`'s, started from the same terminal session): it appears without restarting tallboy. Drag one bookmark onto another to reorder. Bookmarks ▸ Edit Bookmarks… renames and removes.
+- [ ] **Bookmarks.** `Ctrl+D` adds one. Add another in a GTK file chooser (for example `gtk4-demo`'s, started from the same terminal session): it appears without restarting trek. Drag one bookmark onto another to reorder. Bookmarks ▸ Edit Bookmarks… renames and removes.
 - [ ] **Directory tree.** `Ctrl+7`. Navigate somewhere deep: the tree expands to it. Click a row: the view follows.
 - [ ] **Trash.** Trash a file, open the Trash Can, hover it (deleted when, from where), right-click ▸ Restore. Right-click the Trash Can row ▸ Empty Trash Can.
 - [ ] **USB stick.** Insert it: it mounts and the autorun dialog offers "Open in File Manager". Tick "Always perform this action", remove and re-insert: no dialog. Copy a file to it and back. Click its eject button; a tab showing it closes.
 - [ ] **Busy volume.** With a terminal's working directory on the stick, eject: the error says it is in use and nothing is forced.
-- [ ] **Internal disks.** Set `show_internal_volumes=1` (Preferences arrive in Phase 9; until then edit `~/.cache/tallboy-dev/config/tallboy/dev/tallboy.conf`). Click `SSD`: the password prompt appears, it mounts and opens. Unmount it from its row.
-- [ ] **SMB.** Go ▸ Connect to Server…, Windows share: browse, copy one file each way (with the share in `TALLBOY_ALLOW_ROOTS` as `smb://host/share`).
+- [ ] **Internal disks.** Set `show_internal_volumes=1` (Preferences arrive in Phase 9; until then edit `~/.cache/trek-dev/config/trek/dev/trek.conf`). Click `SSD`: the password prompt appears, it mounts and opens. Unmount it from its row.
+- [ ] **SMB.** Go ▸ Connect to Server…, Windows share: browse, copy one file each way (with the share in `TREK_ALLOW_ROOTS` as `smb://host/share`).
 - [ ] **MTP phone.** It appears in Places; browse it. An executable text file on it opens instead of offering to run (deviation 5).
 - [ ] **Properties.** `Alt+Return` on a file, on a folder (the size counts up; close it mid-count), on several files. Compare the values with `stat`. Change permissions on a mixed selection and on a folder with "apply recursively".
 
@@ -229,7 +229,7 @@ Run `TALLBOY_ALLOW_ROOTS=/run/media/$USER/<stick> scripts/dev-run.sh` for the US
 | Item | How | Result |
 |---|---|---|
 | Thumbnails fill in for `fixture/images` in icon, thumbnail and list modes; sharp at scale 1.5 (the `large` cache directory is used); cache files are mode 600 | agent: screenshots at 1920×1080 and 3840×2160, scale 1.5; cache listed | Pass |
-| No stutter while thumbnails are generated; a second visit is served from memory | agent, release build, `TALLBOY_TRACE=1`: longest stall 17 ms generating, 31 ms and 78 ms to loaded on the second visit | Pass |
+| No stutter while thumbnails are generated; a second visit is served from memory | agent, release build, `TREK_TRACE=1`: longest stall 17 ms generating, 31 ms and 78 ms to loaded on the second visit | Pass |
 | A thumbnail arriving does not move rows; the view stays at the top while loading | agent: `scroll=0` after loading with thumbnails on (it had drifted to 2592 before the fix) | Pass |
 | Dual pane: toggle, click or `F6` to change the active pane, commands follow it, copy in one pane and paste in the other, tabs per pane, both ways of losing a pane's last tab | agent: `dual-pane.sh`, real input | Pass |
 | Fullscreen | agent: `navigation.sh` (Phase 6) | Pass |
@@ -253,17 +253,17 @@ Run under XWayland inside the headless compositor with `GDK_BACKEND=x11`; the ow
 | The main window opens, lists a folder, renders menus, the side pane and Preferences | Pass (screenshots) |
 | `navigation.sh` (21), `fileops.sh` (37), `menus.sh` (10), `dual-pane.sh` (19) | Pass, all of them. Pointer checks need `GDK_SCALE=1`: on the headless output GTK's X11 backend chooses scale 2 |
 | `sidepane.sh` | 13 of 15. The two failures are the script's: an X11 window has no title bar here, so the rows sit 38 px higher than the positions the script clicks. Clicked at their X11 positions, Home Folder, Desktop and Trash Can all navigate. The very first pointer click after start is not delivered to an X11 client in this compositor |
-| Drag and drop | A plain drag onto a folder moves the file. **A drag with Ctrl held crashes the compositor itself** (`coredumpctl` shows `/usr/bin/cage`, not tallboy), so modifiers during an X11 drag are **not verified** |
+| Drag and drop | A plain drag onto a folder moves the file. **A drag with Ctrl held crashes the compositor itself** (`coredumpctl` shows `/usr/bin/cage`, not trek), so modifiers during an X11 drag are **not verified** |
 
 ### Owner checkpoint 5
 
-- [ ] **Thumbnails.** `scripts/dev-run.sh ~/.cache/tallboy-fixture/images`, then a folder of real photographs (browsing is not locked). They should fill in without the view jumping, look sharp at 1.5, and appear at once on a second visit. Turn them off and on in Preferences ▸ Display.
+- [ ] **Thumbnails.** `scripts/dev-run.sh ~/.cache/trek-fixture/images`, then a folder of real photographs (browsing is not locked). They should fill in without the view jumping, look sharp at 1.5, and appear at once on a second visit. Turn them off and on in Preferences ▸ Display.
 - [ ] **Dual pane.** `F3`. Click each pane: the path bar, toolbar and status bar follow, and a thin line in the selection colour marks the active one. `F6` goes side pane → pane 1 → pane 2. Copy in one, paste in the other; drag from one to the other. `F3` again closes the second pane.
-- [ ] **Preferences.** Go through the five pages beside PCManFM's. Every change should take effect at once: single click, icon sizes, the Places rows, the tab bar, the path bar mode, the status bar. Close and reopen tallboy: the values are kept.
-- [ ] **Importer.** `scripts/dev-run.sh --import-pcmanfm` prints what it took from your real PCManFM settings into the `dev` profile. (`dev-run.sh` has its own configuration folder, so copy `~/.config/pcmanfm` and `~/.config/libfm` into `~/.cache/tallboy-dev/config/` first.)
+- [ ] **Preferences.** Go through the five pages beside PCManFM's. Every change should take effect at once: single click, icon sizes, the Places rows, the tab bar, the path bar mode, the status bar. Close and reopen trek: the values are kept.
+- [ ] **Importer.** `scripts/dev-run.sh --import-pcmanfm` prints what it took from your real PCManFM settings into the `dev` profile. (`dev-run.sh` has its own configuration folder, so copy `~/.config/pcmanfm` and `~/.config/libfm` into `~/.cache/trek-dev/config/` first.)
 - [ ] **Help.** Help ▸ Keyboard Navigation and Help ▸ About.
-- [ ] **Install side by side.** `scripts/install.sh`, then check `xdg-mime query default inode/directory` still names what it named before, and start `tallboy` from the launcher. It is the locked build: it browses your real folders and refuses to change them. `scripts/install.sh --uninstall` removes it.
-- [ ] **Only if you want it as the folder handler already:** `scripts/install.sh --set-default`; "Show in folder" from a browser's downloads list should open tallboy with the file selected. The script prints the command that restores the previous handler.
+- [ ] **Install side by side.** `scripts/install.sh`, then check `xdg-mime query default inode/directory` still names what it named before, and start `trek` from the launcher. It is the locked build: it browses your real folders and refuses to change them. `scripts/install.sh --uninstall` removes it.
+- [ ] **Only if you want it as the folder handler already:** `scripts/install.sh --set-default`; "Show in folder" from a browser's downloads list should open trek with the file selected. The script prints the command that restores the previous handler.
 - [ ] **X11, optional.** `GDK_BACKEND=x11 scripts/dev-run.sh`: drag files with Ctrl and Shift held, which could not be checked headless.
 
 
@@ -275,7 +275,7 @@ The review and fixes are detailed in [CODE-REVIEW.md](CODE-REVIEW.md) and [HANDO
 |---|---|---|
 | All workspace tests, fmt/clippy, dependency layering; runner exit/warning rejection; GTK smoke and recycled-tree regression | Final `scripts/check.sh`, fatal GLib criticals | Pass |
 | Public documentation | `RUSTDOCFLAGS=-Dwarnings cargo doc --workspace --no-deps` | Pass |
-| Actual GVFS trash/restore/empty | `TALLBOY_TEST_GVFS=1` private-bus test | Three pass |
+| Actual GVFS trash/restore/empty | `TREK_TEST_GVFS=1` private-bus test | Three pass |
 | Full baseline UI suite | 14 scripts; saved logs; every functional assertion | 200 pass; diagnostic gate exposed a symlink-emblem GTK warning, subsequently fixed |
 | Final affected UI paths | Properties / drag / sidepane / new menu-session | 13 / 17 / 15 / 11 pass (56 total), no toolkit warnings |
 | Every menu and Create/View submenus, four view factories, six dialogs, last window closure | New `scripts/agent/checks/session.sh`; screenshots and counters | Pass; tabs=0, folders=0 |

@@ -5,8 +5,8 @@ if [[ -z ${RUSTFMT:-} && -x /usr/bin/rustfmt ]]; then export RUSTFMT=/usr/bin/ru
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 G_DEBUG=fatal-criticals cargo test --workspace
-core_tree=$(cargo tree -p tallboy-core)
-fs_tree=$(cargo tree -p tallboy-fs)
+core_tree=$(cargo tree -p trek-core)
+fs_tree=$(cargo tree -p trek-fs)
 if rg -q '\b(glib|gio|gtk4|gdk4) v' <<<"$core_tree"; then
     echo 'ERROR: core depends on the GObject stack' >&2; exit 1
 fi
@@ -18,10 +18,10 @@ scripts/agent/test-harness.sh
 # A GTK critical aborts the application and fails the run.
 if command -v cage >/dev/null && command -v dbus-run-session >/dev/null; then
     scripts/mkfixture.sh >/dev/null
-    scripts/agent-run.sh --smoke --timeout 60 -- "$HOME/.cache/tallboy-fixture/names" </dev/null
+    scripts/agent-run.sh --smoke --timeout 60 -- "$HOME/.cache/trek-fixture/names" </dev/null
     scripts/agent-run.sh --out target/agent/tree-probe-test --timeout 60 \
         --env G_DEBUG=fatal-criticals \
-        --app 'cargo test -p tallboy stale_directory_probe -- --ignored --test-threads=1' </dev/null
+        --app 'cargo test -p trek stale_directory_probe -- --ignored --test-threads=1' </dev/null
     echo 'GTK smoke: passed'
 else
     echo 'GTK smoke: SKIPPED (cage and dbus-run-session are needed for the headless run)'

@@ -9,9 +9,9 @@ set -uo pipefail
 root="$(cd "$(dirname "$0")/../../.." && pwd)"
 checks="$root/scripts/agent/checks"
 run="$root/scripts/agent-run.sh"
-fixture="$HOME/.cache/tallboy-fixture"
-agent="$HOME/.cache/tallboy-agent"
-conf="$agent/config/tallboy/agent/tallboy.conf"
+fixture="$HOME/.cache/trek-fixture"
+agent="$HOME/.cache/trek-agent"
+conf="$agent/config/trek/agent/trek.conf"
 artifacts="$root/target/agent/checks"
 
 run_session() {
@@ -22,7 +22,7 @@ run_session() {
         echo "FAIL session exited with status $status (logs: $out)"
     fi
     if rg -n '(Gtk|Gdk|GLib|GObject)(-[[:alnum:]]+)*-(WARNING|CRITICAL)|assertion .+ failed' \
-        "$out/tallboy.log" "$out/session.log" >"$out/toolkit-diagnostics.log"; then
+        "$out/trek.log" "$out/session.log" >"$out/toolkit-diagnostics.log"; then
         echo "FAIL toolkit warning or critical (logs: $out/toolkit-diagnostics.log)"
         cat "$out/toolkit-diagnostics.log"
         status=1
@@ -57,7 +57,7 @@ one() {
             seed "$classic"
             run_session --keep --env "TERMINAL=$agent/opening/bin/fake-term" \
                 --env "VISUAL=$agent/opening/bin/fake-edit" \
-                --env "TALLBOY_HOST_XDG_CONFIG_HOME=$agent/opening/host-config" \
+                --env "TREK_HOST_XDG_CONFIG_HOME=$agent/opening/host-config" \
                 -- "$fixture/names" <"$checks/opening.sh"
             ;;
         single-click)
@@ -75,35 +75,35 @@ one() {
             ;;
         leaks|session)
             seed "$classic"
-            run_session --keep --env TALLBOY_TRACE=1 -- --daemon-mode "$fixture/deep" <"$checks/$name.sh"
+            run_session --keep --env TREK_TRACE=1 -- --daemon-mode "$fixture/deep" <"$checks/$name.sh"
             ;;
         filemanager1)
             seed
-            run_session --env TALLBOY_FILEMANAGER1=1 -- --daemon-mode <"$checks/filemanager1.sh"
+            run_session --env TREK_FILEMANAGER1=1 -- --daemon-mode <"$checks/filemanager1.sh"
             EXPECT_OWNED=0 run_session -- --daemon-mode <"$checks/filemanager1.sh"
             ;;
         theme)
             # Read at start-up, so the themes are there before the session.
             themes="$agent/data/themes"
             rm -rf -- "$themes"
-            mkdir -p "$themes"/Tallboy{Three,Light,Unreadable}/gtk-3.0 "$themes/TallboyFour/gtk-4.0"
+            mkdir -p "$themes"/Trek{Three,Light,Unreadable}/gtk-3.0 "$themes/TrekFour/gtk-4.0"
             printf '@define-color %s;\n' 'theme_bg_color #203040' 'theme_base_color #102030' \
                 'theme_fg_color #d0d8e0' 'theme_text_color @theme_fg_color' \
                 'theme_selected_bg_color #c08040' 'theme_selected_fg_color rgba(0, 0, 0, 0.87)' \
-                >"$themes/TallboyThree/gtk-3.0/gtk.css"
+                >"$themes/TrekThree/gtk-3.0/gtk.css"
             printf '@define-color %s;\n' 'theme_bg_color #f0ece4' 'theme_base_color #ffffff' \
                 'theme_fg_color #303030' 'theme_selected_bg_color #a05020' \
-                >"$themes/TallboyLight/gtk-3.0/gtk.css"
+                >"$themes/TrekLight/gtk-3.0/gtk.css"
             printf '@define-color %s;\n' 'theme_bg_color shade(#203040, 1.2)' 'theme_fg_color #d0d8e0' \
-                >"$themes/TallboyUnreadable/gtk-3.0/gtk.css"
+                >"$themes/TrekUnreadable/gtk-3.0/gtk.css"
             printf '%s\n' '@define-color theme_selected_bg_color #4080c0;' \
                 '@define-color theme_selected_fg_color white;' '@define-color theme_fg_color white;' \
                 '@define-color success_color green;' '@define-color error_color red;' \
                 '.view { background-color: #402030; color: white; }' \
-                >"$themes/TallboyFour/gtk-4.0/gtk.css"
+                >"$themes/TrekFour/gtk-4.0/gtk.css"
             for theme in gtk3:Three gtk4:Four light:Light unreadable:Unreadable missing:Missing; do
                 seed
-                THEME_CASE=${theme%:*} run_session --env "TALLBOY_GTK_THEME=Tallboy${theme#*:}" \
+                THEME_CASE=${theme%:*} run_session --env "TREK_GTK_THEME=Trek${theme#*:}" \
                     -- "$fixture/names" <"$checks/theme.sh"
             done
             rm -rf -- "$themes"

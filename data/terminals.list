@@ -1,10 +1,10 @@
-# Terminal emulators tallboy knows how to drive, one per line:
+# Terminal emulators trek knows how to drive, one per line:
 #
 #   program|arguments before a command|arguments that keep the window open
 #
 # The first installed entry is used when neither the "terminal" setting nor
 # $TERMINAL names one. A terminal not listed here is given "-e" and no
-# keep-open flag; tallboy then keeps the window open itself, without a shell.
+# keep-open flag; trek then keeps the window open itself, without a shell.
 foot|-e|--hold
 kitty|-e|--hold
 alacritty|-e|--hold

@@ -1,4 +1,4 @@
-# SCOPE.md — `tallboy` v1
+# SCOPE.md — `trek` v1
 
 Scope and working checklist for v1. Written 2026-10-13 from `PROMPT.md` and `DISCOVERY.md`.
 
@@ -10,7 +10,7 @@ Scope and working checklist for v1. Written 2026-10-13 from `PROMPT.md` and `DIS
 
 ## 1. Overview
 
-`tallboy` is a behavioural port of PCManFM 1.4.0 to Rust on GTK 4, used as the owner's daily file manager on one Fedora + Hyprland workstation. It operates on real files, so the job engine is treated as safety-critical.
+`trek` is a behavioural port of PCManFM 1.4.0 to Rust on GTK 4, used as the owner's daily file manager on one Fedora + Hyprland workstation. It operates on real files, so the job engine is treated as safety-critical.
 
 **In v1:** main window with the full menu bar and toolbar; location entry and breadcrumbs; tabs; dual pane; icon, thumbnail, compact and detailed-list views; sorting, hidden files, filter, zoom, per-folder settings; type-ahead; opening files, Open With, executable and launcher prompts, terminal; copy, move, link, trash, delete and restore jobs with progress, pause, conflict and error dialogs; clipboard and drag-and-drop that interoperate with other file managers; context menus; Places and Directory Tree; bookmarks shared with GTK; trash; volumes, automount, autorun; remote locations and Connect to Server; Properties with permissions; image thumbnails; Preferences; profiles, single instance, daemon mode; `--import-pcmanfm`; `org.freedesktop.FileManager1`; install script.
 
@@ -26,14 +26,14 @@ Three goals, each run by one agent from start to finish. There are exactly two h
 
 | Goal | Agent | Phases | Produces | Ends with |
 |---|---|---|---|---|
-| **A — Backend** | Codex | 1–4 | `tallboy-core` and `tallboy-fs` complete for v1, with headless tests and benchmarks | `HANDOFF-A.md` → Claude |
-| **B — Application** | Claude | 5–9 | The `tallboy` GTK crate, data files, scripts, `QA.md`, README | `HANDOFF-B.md` → Codex |
+| **A — Backend** | Codex | 1–4 | `trek-core` and `trek-fs` complete for v1, with headless tests and benchmarks | `HANDOFF-A.md` → Claude |
+| **B — Application** | Claude | 5–9 | The `trek` GTK crate, data files, scripts, `QA.md`, README | `HANDOFF-B.md` → Codex |
 | **C — Review and release** | Codex | 10 | Review, fixes, performance and leak pass, guard removal, `v1.0.0` | `HANDOFF-C.md` → owner |
 
 **Ownership**
 
-- Codex owns `crates/tallboy-core/`, `crates/tallboy-fs/`, the workspace `Cargo.toml`, `scripts/check.sh` and `scripts/mkfixture.sh`.
-- Claude owns `crates/tallboy/`, `data/`, `scripts/agent-run.sh`, `scripts/dev-run.sh`, `scripts/install.sh`, `README.md` and `.planning/QA.md`.
+- Codex owns `crates/trek-core/`, `crates/trek-fs/`, the workspace `Cargo.toml`, `scripts/check.sh` and `scripts/mkfixture.sh`.
+- Claude owns `crates/trek/`, `data/`, `scripts/agent-run.sh`, `scripts/dev-run.sh`, `scripts/install.sh`, `README.md` and `.planning/QA.md`.
 - Both tick boxes here and append to §9–§12.
 
 **Rules that keep the hand-offs to two**
@@ -56,7 +56,7 @@ DISCOVERY §6 (five interleaved goals) is replaced by §2 above. Consequences:
 - **S1 — D24 (split by crate) stays; its per-goal interleaving goes.** One backend goal, one application goal, one review goal.
 - **S2 — D5 (QA per goal) becomes QA per Goal B phase.** Five checkpoints, same content as the former goals A–E.
 - **S3 — D26 (two reviews of the job engine) is met without an extra hand-off.** Claude's data-loss review opens Phase 7 (task 7.1); Codex's review of everything, including the UI paths that feed the engine, is Phase 10. This settles O-2.
-- **S4 — D13 (job guard): unlock moves to the Phase 10 sign-off.** Until then the owner uses the fixture. The guard gains two rules so QA is still possible: `TALLBOY_ALLOW_ROOTS` adds specific native paths or URI prefixes (a USB mount point, one SMB scratch folder), and `trash://` operations are allowed only when the user data directory is itself under an allowed root, as it is in an isolated run.
+- **S4 — D13 (job guard): unlock moves to the Phase 10 sign-off.** Until then the owner uses the fixture. The guard gains two rules so QA is still possible: `TREK_ALLOW_ROOTS` adds specific native paths or URI prefixes (a USB mount point, one SMB scratch folder), and `trash://` operations are allowed only when the user data directory is itself under an allowed root, as it is in an isolated run.
 - **S5 — D14 (isolation) adds a private D-Bus session.** Agent and dev runs start under `dbus-run-session`, so the trash and volume daemons see the isolated directories and the run cannot collide with the owner's instance. `dbus-run-session` is not installed; it comes with `dbus-daemon` (§8 prerequisites).
 - **S6 — O-1 settled:** Codex creates the Cargo workspace (task 1.2). **O-5 included by default:** recursive delete stops and asks at a mount point (task 3.6). Delete that acceptance clause to revert to upstream behaviour.
 - **S7 — Commit prefix is `phase N:`**, replacing `slice N:` in §10.
@@ -66,7 +66,7 @@ DISCOVERY §6 (five interleaved goals) is replaced by §2 above. Consequences:
 
 ## 4. Architecture
 
-The diagram and layering rules are in DISCOVERY §4. Dependencies point downward only: `tallboy` → `tallboy-fs` → `tallboy-core`.
+The diagram and layering rules are in DISCOVERY §4. Dependencies point downward only: `trek` → `trek-fs` → `trek-core`.
 
 Modules beyond PROMPT §6, added so that logic sits with the backend:
 
@@ -88,15 +88,15 @@ Modules beyond PROMPT §6, added so that logic sits with the backend:
 
 ## 5. Goal A — Backend (Codex)
 
-### Phase 1 — Workspace and `tallboy-core`
+### Phase 1 — Workspace and `trek-core`
 
 *Covers:* slices 0–1, backend half. *Needs:* owner has run `sudo dnf install gtk4-devel rustfmt`.
 
 - [x] **1.1 Toolchain check.** *Accept:* `pkg-config --modversion gtk4 glib-2.0 gio-2.0 gdk-pixbuf-2.0` all resolve and `cargo fmt --version` runs; versions written into §11. If not, stop and tell the owner.
-- [x] **1.2 Workspace.** Root `Cargo.toml` with the D22 pins, the §5 release profile and three crates; `#![deny(unsafe_code)]` and `clippy::unwrap_used` in `core` and `fs`; the `tallboy` crate is a stub `main` that links `gtk4` and prints its version. *Accept:* `cargo build --workspace` succeeds; `cargo tree -p tallboy-core` shows no `glib`; `cargo tree -p tallboy-fs` shows no `gtk4`.
+- [x] **1.2 Workspace.** Root `Cargo.toml` with the D22 pins, the §5 release profile and three crates; `#![deny(unsafe_code)]` and `clippy::unwrap_used` in `core` and `fs`; the `trek` crate is a stub `main` that links `gtk4` and prints its version. *Accept:* `cargo build --workspace` succeeds; `cargo tree -p trek-core` shows no `glib`; `cargo tree -p trek-fs` shows no `gtk4`.
 - [x] **1.3 Repository files.** `COPYING` (GPL-2.0), `.gitignore`, a README stub with build packages. *Accept:* present before the first code commit.
 - [x] **1.4 `scripts/check.sh`.** fmt check, clippy `-D warnings`, tests, the layering assertion from 1.2, and a smoke step that prints a visible "skipped" notice until 5.13. *Accept:* green on the workspace; adding `glib` to `core` makes it fail.
-- [x] **1.5 `scripts/mkfixture.sh`.** Builds `~/.cache/tallboy-fixture` (D8) with `big/`, `deep/`, `images/` (ImageMagick is installed), `names/`, `links/`, `perm/` per §11; idempotent; `--clean`. *Accept:* second run changes nothing; `big/` holds 50,000 files.
+- [x] **1.5 `scripts/mkfixture.sh`.** Builds `~/.cache/trek-fixture` (D8) with `big/`, `deep/`, `images/` (ImageMagick is installed), `names/`, `links/`, `perm/` per §11; idempotent; `--clean`. *Accept:* second run changes nothing; `big/` holds 50,000 files.
 - [x] **1.6 `core::config`.** `Config` mirroring §9 without `[desktop]`, `Default`, and a codec for every enum and list key. *Accept:* round-trip test per codec; unknown or out-of-range values fall back to the default with one warning.
 - [x] **1.7 `core::sort`.** `SortSpec`, `SortKeys`, comparator. *Accept:* folders first in both directions, mingle, case, natural order, name tie-break — all tested.
 - [x] **1.8 `core::naming`.** Unique names, extension splitting, name validation, rename selection range. *Accept:* `archive.tar.gz`, dotfiles and no-extension cases; `(copy)`, `(copy 2)` sequence; empty, `/`, `.`, `..` rejected.
@@ -111,7 +111,7 @@ Modules beyond PROMPT §6, added so that logic sits with the backend:
 - [x] **1.17 `core::invocation`.** Options + arguments + caller cwd + home → requests. *Accept:* relative paths resolve against the caller's cwd; `~` is Home; desktop options yield the D3 message and a non-zero exit code; `--find-files` yields "not in this version".
 - [x] **1.18 Small pure helpers.** Zoom steps; type-ahead matcher with cycling. *Accept:* tests.
 
-### Phase 2 — `tallboy-fs`: reading, settings, launching
+### Phase 2 — `trek-fs`: reading, settings, launching
 
 *Covers:* backend of slices 1–5. *Depends on:* Phase 1.
 
@@ -125,25 +125,25 @@ Modules beyond PROMPT §6, added so that logic sits with the backend:
 - [x] **2.8 `bookmarks`.** Parse and write `gtk-3.0/bookmarks`, atomic; monitor for external change; add, rename, remove, move. *Accept:* round-trip keeps labels and unknown lines; an external edit raises one change event.
 - [x] **2.9 `apps`.** Default application, recommended and all applications for a type, grouped launch with a caller-supplied `gio::AppLaunchContext`, set default, custom command line, launcher launch. *Accept:* three files of two types produce two launches; tests use a temp XDG data dir with fixture `.desktop` files.
 - [x] **2.10 `terminal` and execution.** Parse `data/terminals.list`; resolve terminal (setting → `$TERMINAL` → first installed); open in a directory; execute in terminal; run a command with keep-open. *Accept:* argv only, no shell (D18); a file named `; rm -rf ~` reaches the child as one argument.
-- [x] **2.11 Trace and benchmark.** `TALLBOY_TRACE` timing helpers; `examples/fsls`. *Accept:* on `fixture/big`, first batch ≤ 100 ms and load finished ≤ 1.0 s headless; figures written into §11.
+- [x] **2.11 Trace and benchmark.** `TREK_TRACE` timing helpers; `examples/fsls`. *Accept:* on `fixture/big`, first batch ≤ 100 ms and load finished ≤ 1.0 s headless; figures written into §11.
 
-### Phase 3 — `tallboy-fs`: guard and job engine
+### Phase 3 — `trek-fs`: guard and job engine
 
 *Covers:* backend of slices 6, 8, 10. *Depends on:* Phase 2. This phase is the safety-critical one.
 
-- [x] **3.1 `guard`.** Rules from D13 and S4: allowed roots, `TALLBOY_ALLOW_ROOTS`, the trash rule, `TALLBOY_UNLOCKED`. *Accept:* tests for each rule; one test enumerates every mutating entry point and fails if any bypasses the guard.
+- [x] **3.1 `guard`.** Rules from D13 and S4: allowed roots, `TREK_ALLOW_ROOTS`, the trash rule, `TREK_UNLOCKED`. *Accept:* tests for each rule; one test enumerates every mutating entry point and fails if any bypasses the guard.
 - [x] **3.2 Engine.** `spawn`, `JobHandle`, event channel, prepare phase with totals, pause, resume, cancel, `Ask`/`Reply`, progress throttled to ≤ 10/s. *Accept:* a scripted-responder harness drives a job end to end without GTK.
 - [x] **3.3 Copy.** Per-file copy with `NOFOLLOW_SYMLINKS | ALL_METADATA`; directories walked by the job and merged; conflict question with apply-to-all; self-copy auto-rename; copy-into-self rejected before any write. *Accept:* every conflict answer tested; cancel mid-file leaves no partial file; a metadata-copy failure is a warning, not a failed copy (R11).
 - [x] **3.4 Move.** Native move first; fall back to copy-then-delete per item, deleting the source only after its copy fully succeeded. *Accept:* real cross-filesystem test between `/tmp` and `CARGO_TARGET_TMPDIR`; an injected copy failure leaves the source intact.
 - [x] **3.5 Link.** Symlinks in the destination directory, with conflict handling. *Accept:* test.
 - [x] **3.6 Delete.** Recursive; never follows symlinks; stops and asks at a mount point inside the tree (S6). *Accept:* a symlink to a directory is removed as a link and its target is untouched; a symlink loop terminates.
-- [x] **3.7 Trash, restore, empty.** `TrashUnsupported` question leading to delete-instead; removable-media helper for `no_usb_trash`; restore to `trash::orig-path` with conflicts; empty trash; trash empty/full state. *Accept:* tests gated by `TALLBOY_TEST_GVFS=1` pass on this machine.
+- [x] **3.7 Trash, restore, empty.** `TrashUnsupported` question leading to delete-instead; removable-media helper for `no_usb_trash`; restore to `trash::orig-path` with conflicts; empty trash; trash empty/full state. *Accept:* tests gated by `TREK_TEST_GVFS=1` pass on this machine.
 - [x] **3.8 `SetAttrs` and `Count`.** Recursive mode and owner changes without following symlinks; live size and file counts. *Accept:* totals match `du` and `find | wc -l` on `fixture/deep`; cancel stops promptly.
 - [x] **3.9 Single-item operations.** Rename via `set_display_name` with validation; create folder and empty file with a unique name. All guarded. *Accept:* tests including a name clash.
 - [x] **3.10 Data-loss test pack.** *Accept:* one named test each for: unreadable directory, read-only destination, newline in name, destination disappears mid-job, pause then cancel, two concurrent jobs on the same tree.
 - [x] **3.11 Throughput.** `examples/jobbench`. *Accept:* cross-filesystem copy within 10% of `cp -a`; same-filesystem result on btrfs recorded as cloned or not (D7, O-4).
 
-### Phase 4 — `tallboy-fs`: system services and hand-off
+### Phase 4 — `trek-fs`: system services and hand-off
 
 *Covers:* backend of slices 9, 11, 15 and D10. *Depends on:* Phase 3.
 
@@ -173,13 +173,13 @@ Modules beyond PROMPT §6, added so that logic sits with the backend:
 - [x] **5.4 Command line.** Every §8.27 option, executed through `core::invocation`. *Accept:* `--desktop` prints the D3 message and exits non-zero.
 - [x] **5.5 Action table.** Every command as a `gio::SimpleAction` with its accelerators; stateful toggles and radios; stubs log their name. *Accept:* one table, no command logic in handlers.
 - [x] **5.6 Menu bar.** The §8.2 tree exactly; deferred items disabled or omitted per D4. *Accept:* screenshots of each menu match the installed PCManFM for labels, order, separators and accelerators.
-- [x] **5.7 `Settings`.** Typed getters and setters, `connect_changed`, debounced save, save on shutdown; window size, maximised state and splitter persist. *Accept:* hand-editing `tallboy.conf` changes start-up state.
+- [x] **5.7 `Settings`.** Typed getters and setters, `connect_changed`, debounced save, save on shutdown; window size, maximised state and splitter persist. *Accept:* hand-editing `trek.conf` changes start-up state.
 - [x] **5.8 First-frame baseline.** Measure the empty window (D6). *Accept:* baseline and the resulting budget written into §11.
 - [x] **5.9 `FileItem` and the model stack.** List store → filter → sort (`core::sort`) → multi-selection; batches appended with one `splice`. *Accept:* no per-file append anywhere.
 - [x] **5.10 Tab page and icon view.** `GridView` with cheap factories: build in `setup`, bind in `bind`, disconnect everything in `unbind`. Activation navigates; Backspace goes to the parent. *Accept:* browsing works; no strong reference from an item closure to the tab.
 - [x] **5.11 Status bar and placeholders.** Counts, hidden count, free space; "Folder is empty"; error with Retry. *Accept:* `fixture/perm` shows the error state.
 - [x] **5.12 Live folder events.** Add, change, remove, rename; `RootGone` moves to the nearest ancestor. *Accept:* changes made in a terminal appear within a second.
-- [x] **5.13 Smoke mode.** `TALLBOY_SMOKE=1` loads a folder and exits 0; wired into `check.sh` under `G_DEBUG=fatal-criticals`. *Accept:* a GTK critical fails the run.
+- [x] **5.13 Smoke mode.** `TREK_SMOKE=1` loads a folder and exits 0; wired into `check.sh` under `G_DEBUG=fatal-criticals`. *Accept:* a GTK critical fails the run.
 - [x] **5.14 Spike: selection, drag, compact layout.** Prototype multi-selection drag, rubber band alongside a drag source, and a horizontal `GridView` on the fixture (R2, R4). *Accept:* the chosen gesture design and compact layout are written into §10 before Phase 7 depends on them.
 - [x] **5.15 Large-folder check.** *Accept:* on `fixture/big`: first batch visible ≤ 100 ms, loaded and sorted ≤ 1.5 s, no main-loop stall > 50 ms, memory growth per 10,000 files ≤ 15 MB (R6). A miss is fixed here, not carried.
 - [ ] **5.16 Owner checkpoint 1.** `QA.md` section written. *Owner:* browse folders; compare the menus with PCManFM. *(Section written 2026-10-13; the box is the owner's to tick.)*
@@ -203,7 +203,7 @@ Modules beyond PROMPT §6, added so that logic sits with the backend:
 - [x] **6.13 Open With.** Dialog and submenu per §8.9; set-as-default. *Accept:* a default set here is seen by `xdg-mime query default`.
 - [x] **6.14 Executable and launcher prompts.** Driven by `core::open`. *Accept:* wording matches upstream; `quick_exec` skips the prompt.
 - [x] **6.15 Terminal and Run a Command.** *Accept:* `F4` opens kitty in the folder; no terminal found leads to the error dialog.
-- [x] **6.16 Arguments and lifetime.** Positional arguments, `-n`, daemon mode, the stay-alive rules. *Accept:* `tallboy file.txt dir/` from a second invocation with relative paths does the right thing.
+- [x] **6.16 Arguments and lifetime.** Positional arguments, `-n`, daemon mode, the stay-alive rules. *Accept:* `trek file.txt dir/` from a second invocation with relative paths does the right thing.
 - [ ] **6.17 Owner checkpoint 2.** *Owner:* navigate, switch views, sort, open files. *(QA.md section written 2026-10-13; the box is the owner's to tick.)*
 
 ### Phase 7 — File operations, clipboard, drag-and-drop
@@ -239,7 +239,7 @@ Modules beyond PROMPT §6, added so that logic sits with the backend:
 - [x] **8.9 Devices, Network, Connect to Server.** *Accept:* the dialog builds the right URI for each of the six types.
 - [x] **8.10 Properties: General.** Single and multiple files; live `Count`; Open-with dropdown; rename on OK. *Accept:* values match `stat`; closing the window cancels the count.
 - [x] **8.11 Properties: Permissions.** Three dropdowns with mixed state, owner and group, special bits under `advanced_mode`, recursion prompt, `SetAttrs` job. *Accept:* chmod on a mixed selection matches the `core::perms` tests on disk.
-- [ ] **8.12 Owner checkpoint 4.** *Owner:* USB stick (with its mount point in `TALLBOY_ALLOW_ROOTS`), internal disks (mount and unmount only), SMB, MTP, trash, Properties. `QA.md` marks SFTP, FTP and WebDAV "not verified by hand" (D9). *(QA.md section written 2026-10-13; the box is the owner's to tick.)*
+- [ ] **8.12 Owner checkpoint 4.** *Owner:* USB stick (with its mount point in `TREK_ALLOW_ROOTS`), internal disks (mount and unmount only), SMB, MTP, trash, Properties. `QA.md` marks SFTP, FTP and WebDAV "not verified by hand" (D9). *(QA.md section written 2026-10-13; the box is the owner's to tick.)*
 
 ### Phase 9 — Thumbnails, dual pane, Preferences, packaging
 
@@ -276,7 +276,7 @@ Modules beyond PROMPT §6, added so that logic sits with the backend:
 - [x] **10.7 Session cleanliness.** A scripted `agent-run.sh` session exercising every menu. *Accept:* no GTK warnings or criticals; leak counters at zero on exit.
 - [x] **10.8 Records.** §10 deviations complete and equal to the README list. *Accept:* nothing in the code departs from upstream without a line there.
 - [x] **10.9 `HANDOFF-C.md`.** Review summary, what was fixed, what is left for the owner, and a sign-off checklist. *Accept:* `check.sh` green; pushed.
-- [ ] **10.10 Release.** After the owner signs off: delete `fs::guard` and its call sites (D13), re-run `check.sh`, tag `v1.0.0`. *Accept:* no reference to `TALLBOY_UNLOCKED` remains.
+- [ ] **10.10 Release.** After the owner signs off: delete `fs::guard` and its call sites (D13), re-run `check.sh`, tag `v1.0.0`. *Accept:* no reference to `TREK_UNLOCKED` remains.
 
 **Review status (2026-10-13):** 10.1–10.9 completed; see HANDOFF-C and CODE-REVIEW. 10.10 awaits owner sign-off. The guard and its override remain, and no release tag has been created.
 
@@ -338,9 +338,9 @@ Known at the start; agents append as they go.
 | 12 | Compact view columns are all the same width and long names are ellipsised; upstream fits each column to its longest name. GTK 4's `GridView` has uniform cells | 5.14, R4 |
 | 13 | The selection highlight covers the whole grid cell, as GTK 4 themes draw it, not only the icon and name | D20 |
 | 14 | A press on the padding around an item selects it on release, and a drag from there starts a rubber band; upstream deselects and rubber-bands from the gaps only | 5.14, R2 |
-| 15 | During a drag, Ctrl, Shift and Ctrl+Shift are read from the keyboard by the destination. For a drag that starts in another program they are only seen while tallboy's window has the keyboard, and a link can only be made by tallboy as the destination. Wayland has no link action and sources do not narrow their offer | 7.11 |
+| 15 | During a drag, Ctrl, Shift and Ctrl+Shift are read from the keyboard by the destination. For a drag that starts in another program they are only seen while trek's window has the keyboard, and a link can only be made by trek as the destination. Wayland has no link action and sources do not narrow their offer | 7.11 |
 | 16 | Preparation errors stop the whole job; an execution error on one child ends that top-level folder’s copy, move, delete or attribute change. Skip abandons its remaining children; Retry repeats completed entries and conflicts. Upstream asks per file | HANDOFF-C, review decision 1 |
-| 17 | A kill or crash in mid-copy can leave a hidden `.tallboy-copy-*` file beside the destination; upstream leaves the partial destination file instead | 7.1 |
+| 17 | A kill or crash in mid-copy can leave a hidden `.trek-copy-*` file beside the destination; upstream leaves the partial destination file instead | 7.1 |
 | 18 | A folder dropped on the empty part of Places becomes a bookmark. Dropping exactly *between* two bookmarks is not told apart from dropping *on* one, which puts the files into that folder; files cannot be dropped on the Trash Can row | 8.4 |
 | 19 | The directory tree shows a hidden folder that lies on the way to the current folder even when hidden files are off, so the current folder can always be seen in it | 8.5 |
 | 20 | Owner and group names in Properties are looked up in `/etc/passwd` and `/etc/group`; an account known only to a directory service must be given as a number | 8.11 |
@@ -351,7 +351,7 @@ Known at the start; agents append as they go.
 | 25 | Passwords embedded in a location’s userinfo are rejected; credentials must be entered through the mount prompt | DISCOVERY §7, Phase 10 |
 | 26 | Recursive permission changes prepare the tree and visit children before parents; an inaccessible subtree cannot be repaired by granting access recursively | HANDOFF-C, review decision 2 |
 | 27 | A listing error after an initial batch leaves the partial view in Loading; partial-result error presentation awaits an owner decision | HANDOFF-C, review decision 3 |
-| 28 | Text files open in the editor (`$VISUAL`, then `$EDITOR`, then `nvim`) in the terminal, whatever application is set for their type; that includes executable scripts, which are no longer offered for execution unless `quick_exec=1`. Pictures written in XML (SVG) keep their applications. An application with `Terminal=true` is started in tallboy's terminal, not one from GIO's list | Owner request, 2026-10-14 |
+| 28 | Text files open in the editor (`$VISUAL`, then `$EDITOR`, then `nvim`) in the terminal, whatever application is set for their type; that includes executable scripts, which are no longer offered for execution unless `quick_exec=1`. Pictures written in XML (SVG) keep their applications. An application with `Terminal=true` is started in trek's terminal, not one from GIO's list | Owner request, 2026-10-14 |
 
 ### Design notes that later phases depend on
 
@@ -396,19 +396,19 @@ Known at the start; agents append as they go.
 
 | Crate | Version | Used by |
 |---|---|---|
-| `gtk4` (feature `v4_14`) | 0.11.5 | `tallboy` |
-| `glib`, `gio` | 0.22.10 (`gio/v2_78`) | `tallboy-fs`; raw non-UTF-8 trash paths require `FileInfo::attribute_file_path` |
-| `gdk-pixbuf` | 0.22.0 | `tallboy-fs` |
-| `gio-unix` | 0.22.8 | `tallboy-fs`; verified `DesktopAppInfo` is in this crate |
-| `async-channel` | 2.5.0 | `tallboy-fs` |
+| `gtk4` (feature `v4_14`) | 0.11.5 | `trek` |
+| `glib`, `gio` | 0.22.10 (`gio/v2_78`) | `trek-fs`; raw non-UTF-8 trash paths require `FileInfo::attribute_file_path` |
+| `gdk-pixbuf` | 0.22.0 | `trek-fs` |
+| `gio-unix` | 0.22.8 | `trek-fs`; verified `DesktopAppInfo` is in this crate |
+| `async-channel` | 2.5.0 | `trek-fs` |
 | `thiserror` | 2.0.21 | `core`, `fs` |
 | `log` | 0.4.34 | all |
 | `tempfile` (dev) | 3.27.0 | tests |
-| `glib-unix` | 0.22.8 | `tallboy`; `SIGTERM`/`SIGINT`/`SIGHUP` sources. gtk-rs moved `unix_signal_add_local` out of `glib` in 0.22, as it did `DesktopAppInfo` into `gio-unix`; the alternative was hand-written `unsafe` `sigaction` |
-| `gio` feature `v2_80` | — | `tallboy`; `ApplicationCommandLine::printerr_literal`, the only way to print an option error on the *calling* terminal when the invocation is forwarded to a running instance |
-| `glib` feature `log` | — | `tallboy`; `GlibLogger`, the `log` → GLib bridge |
-| `nucleo` | 0.5.0 | `tallboy-fs`; the fuzzy finder (`z`). Helix's matcher: fzf's scoring and query syntax, matching on its own threads. Replaces nothing; the alternative was starting `fzf --filter` per keystroke, or a hand-written scorer on the main loop. Brings `rayon` and `parking_lot`. MPL-2.0 |
-| `ignore` | 0.4.33 | `tallboy-fs`; walks the tree for the finder as fd and ripgrep do, honouring `.gitignore` and `.ignore`. The alternative was `std::fs::read_dir` and a second, different reading of ignore files. Brings `globset`, `regex-automata`, `walkdir` |
+| `glib-unix` | 0.22.8 | `trek`; `SIGTERM`/`SIGINT`/`SIGHUP` sources. gtk-rs moved `unix_signal_add_local` out of `glib` in 0.22, as it did `DesktopAppInfo` into `gio-unix`; the alternative was hand-written `unsafe` `sigaction` |
+| `gio` feature `v2_80` | — | `trek`; `ApplicationCommandLine::printerr_literal`, the only way to print an option error on the *calling* terminal when the invocation is forwarded to a running instance |
+| `glib` feature `log` | — | `trek`; `GlibLogger`, the `log` → GLib bridge |
+| `nucleo` | 0.5.0 | `trek-fs`; the fuzzy finder (`z`). Helix's matcher: fzf's scoring and query syntax, matching on its own threads. Replaces nothing; the alternative was starting `fzf --filter` per keystroke, or a hand-written scorer on the main loop. Brings `rayon` and `parking_lot`. MPL-2.0 |
+| `ignore` | 0.4.33 | `trek-fs`; walks the tree for the finder as fd and ripgrep do, honouring `.gitignore` and `.ignore`. The alternative was `std::fs::read_dir` and a second, different reading of ignore files. Brings `globset`, `regex-automata`, `walkdir` |
 
 **Measurements** (filled in by tasks 1.1, 2.11, 3.11, 5.8, 5.15, 10.6). UI figures come from `scripts/agent/bench.sh`: release build, headless `cage` at 3840×2160 and scale 1.5 like the owner's monitor, timed from just before `exec`. They were not taken on the live GPU session, which agents must not use:
 
@@ -465,7 +465,7 @@ Agents append one line per choice made under §2 rule 4.
 
 - Phase 4: The read-only volume example confirmed `/dev/sda1` and `/dev/nvme0n1p3` as unmounted internal disks. Busy GIO errors are preserved without FORCE; actual busy physical-device unmount is reserved for owner checkpoint 8.12. Automount uses the unfiltered inventory, independent of Places visibility.
 
-- Phase 3: `TALLBOY_ALLOW_ROOTS` uses semicolon/newline separators so URI ports remain intact. Parent canonicalization is a guard check only; user-file mutations all use GIO. URI dot traversal is refused while guarded.
+- Phase 3: `TREK_ALLOW_ROOTS` uses semicolon/newline separators so URI ports remain intact. Parent canonicalization is a guard check only; user-file mutations all use GIO. URI dot traversal is refused while guarded.
 - Phase 3: Job protocol boxes conflict metadata and separates `Answer` from single-use `Reply::answer`; `JobOptions` carries `no_usb_trash` and optional initial pause. Count logical sizes exclude directory entry sizes (matching this btrfs `du -sb`); allocated sizes are separate.
 - Phase 3: Private GVFS tests and remote headless tools must poll the default GLib context. New isolated contexts work for local GIO, but GVFS asynchronous completion hung until the default context was dispatched.
 - Phase 3: Jobs use a lightweight metadata query for traversal and full metadata only for conflict dialogs. Copies stage to an absent private path (exclusive GIO create); avoiding nested GIO overwrite persistence meets the throughput gate. Mixed file-type replacements retain a backup until publication succeeds and roll back failures.
@@ -477,12 +477,12 @@ Agents append one line per choice made under §2 rule 4.
 - Phase 1: Pure date formatting uses UTC; the UI may use GLib local-time formatting. Rename ranges use UTF-8 byte offsets and must be converted to character offsets by GTK. Profile ids escape hyphens/underscores to avoid instance collisions.
 - Phase 1: Fedora system rustfmt works; stale `~/.cargo/bin/rustfmt` lacks its driver library. Select `/usr/bin/rustfmt` via `RUSTFMT` in the check script when available; no global toolchain changes.
 
-- Phase 5: `dev-run.sh` uses the profile `dev` under `~/.cache/tallboy-dev`, not `agent`: `agent-run.sh` wipes the agent profile on every run, and owner QA should keep its window size and settings between runs.
+- Phase 5: `dev-run.sh` uses the profile `dev` under `~/.cache/trek-dev`, not `agent`: `agent-run.sh` wipes the agent profile on every run, and owner QA should keep its window size and settings between runs.
 - Phase 5: Move to Trash, Remove and Backspace-for-parent are bound on the folder view, not as application accelerators. That is what upstream does (its menu shows no shortcut for them), and it is half of the R3 answer: those keys cannot reach a file while a text entry has focus. The other half is in the window: while an editable has focus, Cut, Copy, Paste and Select All are disabled so the entry gets the keys.
 - Phase 5: Listings follow symbolic links for display metadata (type, size, content type of the target) while `symlink` and `symlink_target` still identify the link; upstream does the same. Jobs never follow links.
 - Phase 5: Zoom In and Zoom Out list the keypad shortcut first so the menu reads as upstream's; `Ctrl+=` and `Ctrl+-` work as well.
 - Phase 5: `agent-run.sh` drives the UI two ways: actions over D-Bus, and real keyboard and pointer input through `scripts/agent/vinput.c`, a small wlroots virtual-keyboard and virtual-pointer client built on demand with `cc` and `wayland-scanner`. `wtype` and `ydotool` are not installed.
-- Phase 5: A hidden `win.debug-dump` action prints one `tallboy state:` line (location, load state, counts, selection, focus); agent checks read it back. `win.go-to` takes a path or URI. Neither is in any menu.
+- Phase 5: A hidden `win.debug-dump` action prints one `trek state:` line (location, load state, counts, selection, focus); agent checks read it back. `win.go-to` takes a path or URI. Neither is in any menu.
 
 - Phase 6: The toolbar has upstream's history arrow between Back and Forward as well as the right-click and long-press that PROMPT §8.3 asks for; all three open the same menu, newest entry first.
 - Phase 6: Activating an item that is part of the selection opens the whole selection, as upstream does; one folder is entered in place, several folders open as tabs.
@@ -500,13 +500,13 @@ Agents append one line per choice made under §2 rule 4.
 - Phase 7: Move to Trash is removed from the window's action map inside `trash://`, and its menu item is hidden when the action is missing. A disabled action would only grey it out, and the menu bar model is shared by all windows.
 - Phase 7: Rename and Create New run the backend's synchronous helpers on a worker (`gio::spawn_blocking`); their dialogs validate the name first and stay open on an invalid one.
 - Phase 7: Create Link…, Move to… and Copy to… use `gtk::FileDialog::select_folder`, which is the portal's chooser when one runs.
-- Phase 7: Paste after Cut empties the clipboard only when tallboy owns it; another program's clipboard cannot be cleared from here.
+- Phase 7: Paste after Cut empties the clipboard only when trek owns it; another program's clipboard cannot be cleared from here.
 
 - Phase 8: Two more engine defects surfaced through the trash view and were fixed with tests: the metadata conversion aborted on a file info lacking an attribute, and the folder monitor reported the watched folder's own attribute changes as a child. Both are in `HANDOFF-B.md` §1.
 - Phase 8: Context menus are built when shown, from the window's actions; "Open With" lists the applications registered for the type. Templates, archiver items and custom actions are left out (D4).
 - Phase 8: Right-click on an item's padding counts as empty space and clears the selection, consistent with deviation 14.
-- Phase 8: The autorun choice "Open in File Manager" is stored in `[autorun]` as `tallboy`.
-- Phase 8: Autorun is only offered for a volume that tallboy itself mounted because it was inserted, not for one mounted by hand or by another program.
+- Phase 8: The autorun choice "Open in File Manager" is stored in `[autorun]` as `trek`.
+- Phase 8: Autorun is only offered for a volume that trek itself mounted because it was inserted, not for one mounted by hand or by another program.
 - Phase 8: Bookmarks and volumes are application-wide; one task each follows the bookmarks file and the volume monitor and tells every window's side pane to rebuild.
 - Phase 8: The tree does not list a folder's subfolders until its row is expanded; `no_child_non_expandable` is honoured with one cheap probe per row as it comes into view.
 - Phase 8: Properties validates the name, the owner and group, and the default application before applying anything, so a rejected value changes nothing.
@@ -517,9 +517,9 @@ Agents append one line per choice made under §2 rule 4.
 - Phase 9: Preferences is one non-modal window per application, without OK or Cancel; text fields apply on Enter, on losing the keyboard and on close. The page builder (`dialogs/prefs.rs`) is the only place that binds a widget to a setting.
 - Phase 9: `--import-pcmanfm` reads PCManFM's profile of the same name as ours and falls back to its `default` profile, so `--profile dev --import-pcmanfm` imports something. Imported keys are applied on top of the profile's current values, not on top of defaults.
 - Phase 9: The importer and `--show-pref` errors are answered from the command-line handler; a first instance's failing status is also kept in the application's own exit code, because GLib resets it once the main loop has turned.
-- Phase 9: `FileManager1` is only asked for by the `default` profile. `TALLBOY_FILEMANAGER1=1` overrides that for agent checks on a private bus; it is not documented for users.
+- Phase 9: `FileManager1` is only asked for by the `default` profile. `TREK_FILEMANAGER1=1` overrides that for agent checks on a private bus; it is not documented for users.
 - Phase 9: `install.sh` takes `--prefix` and `--uninstall` beyond what D27 names. The launcher is written with the binary's full path. Agents verified it in a scratch prefix only; installing into the owner's `~/.local` is the owner's step at checkpoint 5.
-- Phase 9: The icon is installed under the application id, `io.github.codedsleep.Tallboy`; About falls back to the theme's file-manager icon when it is not installed.
+- Phase 9: The icon is installed under the application id, `io.github.codedsleep.Trek`; About falls back to the theme's file-manager icon when it is not installed.
 - Phase 9: The leak counters count what the UI holds: a tab page, and a folder being listed and watched by a tab or by a directory-tree row.
 
 - Phase 10: Preserve a folder that replaces a conflict's file before publication, and query the activated target's filesystem before trusting execution; these restore D15 and existing overwrite policy.
@@ -534,14 +534,14 @@ Agents append one line per choice made under §2 rule 4.
 
 ### Theme (2026-10-14)
 
-Asked for by the owner: PCManFM shows the NordArc palette and tallboy showed GTK's grey. D20 had accepted that "until a GTK 4 Nord theme is installed"; this replaces the waiting.
+Asked for by the owner: PCManFM shows the NordArc palette and trek showed GTK's grey. D20 had accepted that "until a GTK 4 Nord theme is installed"; this replaces the waiting.
 
 - **Cause.** GTK 4 loads `THEME/gtk-4.x/gtk.css` only. NordArc-Theme ships `gtk-2.0` and `gtk-3.0`, so GTK 4 fell back to its built-in theme. Under `scripts/dev-run.sh` it never even saw the name: the private session's settings portal answers `Adwaita`.
 - **What a GTK 3 theme still gives.** Its named colours (`@define-color theme_bg_color` and about thirty more), which are the same names GTK 4's built-in theme defines. The built-in stylesheet (GTK 4.22: 1,900 rules, about 150 distinct colour literals, no variables) is compiled from that palette, so every literal in it is a named colour or derived from one.
-- **What is done** (`tallboy-core::palette`, `tallboy/src/theme.rs`). At start-up, when the theme has no GTK 4 part but its GTK 3 stylesheet names a background, a text and a selection colour, the built-in stylesheet (`Default-dark.css` or `-light.css`, by the palette's own lightness) is read from GTK's resources and each colour literal in a declaration is carried over: a named colour's value becomes the theme's value; a grey is placed between the theme's base, background and text colours where it stood between the built-in ones; a shade of the selection, error, success or warning colour (same hue within 20°) becomes the same shade of the theme's; `color: #ffffff`, and `color: white` in a rule that paints a selection-coloured background, become the theme's selection text colour. Anything else is left. The result replaces the built-in theme (`gtk-theme-name=Empty`, provider at theme priority), so one stylesheet is matched as before; first frame in a release build was 441–507 ms without and 457–478 ms with it, the same within noise. If GTK reports an error in the result, it is dropped and the built-in look stays.
+- **What is done** (`trek-core::palette`, `trek/src/theme.rs`). At start-up, when the theme has no GTK 4 part but its GTK 3 stylesheet names a background, a text and a selection colour, the built-in stylesheet (`Default-dark.css` or `-light.css`, by the palette's own lightness) is read from GTK's resources and each colour literal in a declaration is carried over: a named colour's value becomes the theme's value; a grey is placed between the theme's base, background and text colours where it stood between the built-in ones; a shade of the selection, error, success or warning colour (same hue within 20°) becomes the same shade of the theme's; `color: #ffffff`, and `color: white` in a rule that paints a selection-coloured background, become the theme's selection text colour. Anything else is left. The result replaces the built-in theme (`gtk-theme-name=Empty`, provider at theme priority), so one stylesheet is matched as before; first frame in a release build was 441–507 ms without and 457–478 ms with it, the same within noise. If GTK reports an error in the result, it is dropped and the built-in look stays.
 - **Not evaluated:** the GTK 3 colour functions (`shade()`, `mix()`, `alpha()`) in a theme's definitions. A theme whose background, text or selection colour is written with them is not recoloured. Compiled themes write literals.
-- **Two facts about GTK 4.22 that shaped it,** read in `gtksettings.c` and `gtkcssprovider.c` after a provider at theme priority had no effect. The theme provider sits at `GTK_STYLE_PROVIDER_PRIORITY_SETTINGS` (400), not `_THEME` (200), so a provider below 400 never wins against a loaded theme; hence the empty theme. And a theme without the variant that is asked for is replaced by the *built-in* theme in that variant, not by its own plain stylesheet: with `gtk-application-prefer-dark-theme` set, a GTK 4 theme that has only `gtk.css` was being ignored. tallboy therefore asks for the dark variant only when the theme has `gtk-dark.css`.
-- **dev-run.sh** passes the desktop's theme name as `TALLBOY_GTK_THEME`; agent runs do not set it and keep GTK's own look, so the pointer checks' screenshots are unchanged. `GTK_THEME` still overrides everything, inside GTK.
+- **Two facts about GTK 4.22 that shaped it,** read in `gtksettings.c` and `gtkcssprovider.c` after a provider at theme priority had no effect. The theme provider sits at `GTK_STYLE_PROVIDER_PRIORITY_SETTINGS` (400), not `_THEME` (200), so a provider below 400 never wins against a loaded theme; hence the empty theme. And a theme without the variant that is asked for is replaced by the *built-in* theme in that variant, not by its own plain stylesheet: with `gtk-application-prefer-dark-theme` set, a GTK 4 theme that has only `gtk.css` was being ignored. trek therefore asks for the dark variant only when the theme has `gtk-dark.css`.
+- **dev-run.sh** passes the desktop's theme name as `TREK_GTK_THEME`; agent runs do not set it and keep GTK's own look, so the pointer checks' screenshots are unchanged. `GTK_THEME` still overrides everything, inside GTK.
 - **Not done:** following a theme change while running (the name is read once), and anything about widget shapes. The alternatives were a GTK 4 port of the theme installed under the same name, which GTK would load by itself and every GTK 4 program would get, and libadwaita, whose stylesheet is recoloured through named colours by design but would change the look and add a dependency.
 
 Checked with `scripts/check.sh` and `scripts/agent/checks/theme.sh` (five sessions: a GTK 3 theme, a GTK 4 theme without a dark variant, a light GTK 3 theme, one whose colours cannot be read, one that is not installed; colours read off the screen).
@@ -586,7 +586,7 @@ One entry per completed phase: date, agent, commit range, what was verified by t
 
 - 2026-10-13 — Codex, Phase 2, `a2b6422` through the phase-completion commit: settings, metadata, 5,000-item loading/cancellation, coalesced create/modify/rename/delete/RootGone, bookmarks, completion and private-XDG two-application launches pass. Shell-special filenames reach children as one argv entry. Release 50,000-item benchmark and warning-free cargo doc verified. `check.sh` green with fatal GLib criticals. Live mounts deferred to Goal B as scoped.
 
-- 2026-10-13 — Codex, Phase 3, guarded-engine commit through the phase-completion commit: all job and data-loss tests pass, including a real tmpfs→btrfs move and injected unreadable-source copy failure. Private-bus GVFS trash/restore/empty and unsupported-trash delete offer pass with `TALLBOY_TEST_GVFS=1`. Cross-filesystem throughput ratio 1.005; btrfs clones verified. `check.sh` green, warning-free docs, no owner-file mutations or screenshots. Mount-boundary detection is unit-tested; no physical disk mount state was changed.
+- 2026-10-13 — Codex, Phase 3, guarded-engine commit through the phase-completion commit: all job and data-loss tests pass, including a real tmpfs→btrfs move and injected unreadable-source copy failure. Private-bus GVFS trash/restore/empty and unsupported-trash delete offer pass with `TREK_TEST_GVFS=1`. Cross-filesystem throughput ratio 1.005; btrfs clones verified. `check.sh` green, warning-free docs, no owner-file mutations or screenshots. Mount-boundary detection is unit-tested; no physical disk mount state was changed.
 
 - 2026-10-13 — Codex, Phase 4, `4b1ed0c` through the Goal A gate commit: volume filters/autorun/affected locations and Busy error preservation, installed PNG Thumb:: chunk readback at mode 0600, fractional size classes, 500 thumbnail requests, orientation and pre-start cancellation, owner config copies and quick_exec advisory, private-bus gdbus requests/name ownership, raw argv and same-server symlink paths verified by tests. Read-only volume example lists sda1 and the second NVMe correctly. All 68 workspace tests pass with fatal GLib criticals (including private GVFS); fmt/clippy/layering and warning-free docs pass. Public API documentation is enforced by the compiler; HANDOFF-A maps every Goal B task. GTK smoke stays explicitly deferred to 5.13; no screenshots, owner QA or physical-device mount changes in Goal A.
 
@@ -594,7 +594,7 @@ One entry per completed phase: date, agent, commit range, what was verified by t
 
 - 2026-10-13 — Claude, Phase 6, `524873a` through the phase-completion commit. **By test** (`check.sh` green): history menu jump, path-completion prefix, type-ahead backward search, plus the earlier suites. **By agent** (`scripts/agent/checks/navigation.sh`, `opening.sh`, `single-click.sh`, all PASS, and scripted runs listed in QA.md): toolbar toggles, tabs, completion, the 6.6 shortcut-safety check with real keys, breadcrumbs, history menu, list headers and column menu, mode switching on `fixture/big`, zoom, filter, per-folder settings, type-ahead, single click with hover, emblems, grouped launches, the shell-name file, Open With and set-default, execute and launcher prompts, terminal, Run a Command, command-line files and folders, `-n`, daemon mode and lifetime. **By hand:** owner checkpoint 2 is open; focus of a launched application under Hyprland can only be checked there. Backend patch (for `HANDOFF-B.md`): `History::entries`, `index`, `go_to`. Agent tooling fix: `agent-run.sh` no longer races a stale log.
 
-- 2026-10-13 — Claude, Phase 7, `b565fa6` through the phase-completion commit. **By review:** task 7.1, written up in `HANDOFF-B.md` §2. **By test** (`check.sh` green; trash tests also with `TALLBOY_TEST_GVFS=1`): `a_file_never_replaces_a_folder`, `a_folder_may_replace_a_file_and_keeps_its_source`, the non-empty trashed folder in `gvfs_trash_subprocess`, `copying_a_folder_keeps_its_mode_and_time_without_a_warning`. **By agent** (`scripts/agent/checks/fileops.sh` 37 checks, `dnd.sh` 13, `dnd-ask.sh` 3, `progress.sh` 8, and `navigation.sh` and `opening.sh` again; all PASS): create, rename, copy, cut, paste, every conflict answer, copy path, trash and remove with confirmations, file keys in a text entry, enablement, the locked-build refusal, progress with pause, resume and cancel on 50,000 files, drags with each modifier, selection drags, no-op and into-self, tab-label hover and drop, the ask menu. **By hand:** owner checkpoint 3 is open; clipboard and drag with other programs can only be checked there. Backend patches (for `HANDOFF-B.md`): trashed folders deleted whole; `Question::Conflict::can_overwrite` and `JobError::ReplaceFolder`; no warning for the unsettable `standard::size` on folders.
+- 2026-10-13 — Claude, Phase 7, `b565fa6` through the phase-completion commit. **By review:** task 7.1, written up in `HANDOFF-B.md` §2. **By test** (`check.sh` green; trash tests also with `TREK_TEST_GVFS=1`): `a_file_never_replaces_a_folder`, `a_folder_may_replace_a_file_and_keeps_its_source`, the non-empty trashed folder in `gvfs_trash_subprocess`, `copying_a_folder_keeps_its_mode_and_time_without_a_warning`. **By agent** (`scripts/agent/checks/fileops.sh` 37 checks, `dnd.sh` 13, `dnd-ask.sh` 3, `progress.sh` 8, and `navigation.sh` and `opening.sh` again; all PASS): create, rename, copy, cut, paste, every conflict answer, copy path, trash and remove with confirmations, file keys in a text entry, enablement, the locked-build refusal, progress with pause, resume and cancel on 50,000 files, drags with each modifier, selection drags, no-op and into-self, tab-label hover and drop, the ask menu. **By hand:** owner checkpoint 3 is open; clipboard and drag with other programs can only be checked there. Backend patches (for `HANDOFF-B.md`): trashed folders deleted whole; `Question::Conflict::can_overwrite` and `JobError::ReplaceFolder`; no warning for the unsettable `standard::size` on folders.
 
 - 2026-10-13 — Claude, Phase 8, `8e551f8` through the phase-completion commit. **By test** (`check.sh` green): `sparse_info_from_a_backend_is_not_fatal`, `a_change_to_the_watched_folder_itself_is_not_a_child_event`, the six Connect to Server URIs and its error cases, the id lookup. **By agent** (`scripts/agent/checks/menus.sh`, `sidepane.sh`, `properties.sh`, all PASS, and the earlier scripts again): the context menus and right-click rules, trash listing, restore and emptying in the agent profile's trash, Places rows and their config keys, the shared bookmarks file including an external edit, the tree following through a hidden folder and live changes, Properties with rename, live count, a mixed-selection chmod and a recursive one, the Connect dialog. Volumes were only *listed*: nothing was mounted, unmounted or ejected. **By hand:** owner checkpoint 4 is open and carries everything that needs a device, a share, a phone or another program; SFTP, FTP and WebDAV are marked "not verified by hand" in QA.md (D9). Backend patches (for `HANDOFF-B.md`): attribute-safe `FileMeta::from_info`; monitor events about the watched folder itself ignored.
 
@@ -604,4 +604,4 @@ One entry per completed phase: date, agent, commit range, what was verified by t
 
 - 2026-10-14 — Claude, latency pass (owner request; §11 "Latency pass"). **By test** (`check.sh` green): `a_listing_goes_by_name_and_reads_only_what_the_name_leaves_open`, `listed_user_folders_get_the_icons_gio_gives_them`, the folder tests adjusted for `FolderEvent::Typed`. **By agent**: `run-all.sh`, 17 scripts, 361 assertions, all PASS; `latency.sh` and `bench.sh` for the figures; screenshots of `/usr` ↔ `/usr/bin` reviewed for icons, the parent's mark and the cursor returning to the folder left. `opening.sh` no longer builds its unknown-type file from random bytes, which had once sniffed as `text/x-matlab`. **Not done by hand:** the feel on the owner's GPU session.
 
-- 2026-10-14 — Claude, theme (owner request; §12 "Theme"). **By test** (`check.sh` green): ten tests in `tallboy-core::palette` for reading named colours, each kind of carried-over colour, what must stay untouched (selectors, quoted strings, nested at-rules) and a light palette. **By agent**: `run-all.sh`, 18 scripts, 389 assertions, all PASS, `theme.sh` being the new one; screenshots under NordArc-Theme reviewed for the main window, selection, which-key, finder, menus, Preferences, Properties, tabs and the classic icon and list views; the name read from the session's settings instead of `TALLBOY_GTK_THEME` gives the same colours. **Not done by hand:** the look on the owner's display.
+- 2026-10-14 — Claude, theme (owner request; §12 "Theme"). **By test** (`check.sh` green): ten tests in `trek-core::palette` for reading named colours, each kind of carried-over colour, what must stay untouched (selectors, quoted strings, nested at-rules) and a light palette. **By agent**: `run-all.sh`, 18 scripts, 389 assertions, all PASS, `theme.sh` being the new one; screenshots under NordArc-Theme reviewed for the main window, selection, which-key, finder, menus, Preferences, Properties, tabs and the classic icon and list views; the name read from the session's settings instead of `TREK_GTK_THEME` gives the same colours. **Not done by hand:** the look on the owner's display.

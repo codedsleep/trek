@@ -5,14 +5,14 @@
 # protocol log, how long after an input event (or after exec) it committed a
 # frame. Release build, 3840x2160 at scale 1.5 like the owner's monitor.
 #
-#   scripts/agent/latency.sh                    tallboy, pcmanfm, pcmanfm-list
-#   scripts/agent/latency.sh tallboy            one of them
+#   scripts/agent/latency.sh                    trek, pcmanfm, pcmanfm-list
+#   scripts/agent/latency.sh trek               one of them
 #   LATENCY_ONLY=nav scripts/agent/latency.sh   only the scenarios of one group
 #                                               (start, mid, big or nav)
 #
 # pcmanfm is PCManFM as installed with its stock settings (icon view);
 # pcmanfm-list is the same in its detailed list view, the nearer relative of
-# tallboy's lines. Folders are only read. Rows land in
+# trek's lines. Folders are only read. Rows land in
 # target/agent/latency/rows.tsv, the table is printed.
 #
 # What the figures are not: cage has no fractional-scale protocol, so GTK 4
@@ -22,11 +22,11 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 out="$root/target/agent/latency"
-apps=${*:-tallboy pcmanfm pcmanfm-list}
+apps=${*:-trek pcmanfm pcmanfm-list}
 command -v pcmanfm >/dev/null || { echo "latency.sh: pcmanfm is not installed" >&2; exit 2; }
-cargo build --release -q -p tallboy
+cargo build --release -q -p trek
 # Two small folders to walk into and out of.
-tree="$HOME/.cache/tallboy-agent/latency/nav"
+tree="$HOME/.cache/trek-agent/latency/nav"
 if [[ ! -d $tree ]]; then
     for d in a b; do
         mkdir -p "$tree/$d"
@@ -37,16 +37,16 @@ rm -rf "$out"
 
 LATENCY_APPS=$apps LATENCY_ONLY=${LATENCY_ONLY:-} "$root/scripts/agent-run.sh" --release \
     --size 3840x2160 --scale 1.5 --app "sleep 3000" --out "$out" --timeout 2700 <<'DRIVER'
-bin="$root/target/release/tallboy"
-fixture="$HOME/.cache/tallboy-fixture"
-tree="$HOME/.cache/tallboy-agent/latency/nav"
+bin="$root/target/release/trek"
+fixture="$HOME/.cache/trek-fixture"
+tree="$HOME/.cache/trek-agent/latency/nav"
 # PCManFM finds a running instance through a socket in XDG_RUNTIME_DIR. It gets
 # a runtime directory of its own, so that it can never hand its folder to a
 # PCManFM on the owner's desktop, and settings of its own, written before every
 # launch (it saves them on exit).
-runtime=$(mktemp -d "$HOME/.cache/tallboy-agent/latency/runtime-XXXXXX")
+runtime=$(mktemp -d "$HOME/.cache/trek-agent/latency/runtime-XXXXXX")
 chmod 700 "$runtime"
-settings="$HOME/.cache/tallboy-agent/latency/pcmanfm-config"
+settings="$HOME/.cache/trek-agent/latency/pcmanfm-config"
 display="$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
 serial=0
 
@@ -70,8 +70,8 @@ mark() { printf 'MARK %s\n' "$*" >>"$log"; }
 launch() {
     log="$OUT/$app.$((++serial)).wl"
     case $app in
-        tallboy)
-            rm -rf "$XDG_CONFIG_HOME/tallboy/agent"
+        trek)
+            rm -rf "$XDG_CONFIG_HOME/trek/agent"
             printf 'T0 %s %s\n' "$(date -u +%T.%6N)" "$1" >"$log"
             WAYLAND_DEBUG=1 "$bin" --profile agent "$2" >/dev/null 2>>"$log" &
             ;;
@@ -112,7 +112,7 @@ wanted() { [[ -z $LATENCY_ONLY || $LATENCY_ONLY == "$1" ]]; }
 
 for app in $LATENCY_APPS; do
     case $app in
-        tallboy) down=j bottom=G page=ctrl+f enter=l parent=h tab=t invert=ctrl+r first=() ;;
+        trek) down=j bottom=G page=ctrl+f enter=l parent=h tab=t invert=ctrl+r first=() ;;
         # Home puts PCManFM's cursor on the first folder; it is not measured.
         *) down=Down bottom=End page=Page_Down enter=Return parent=BackSpace tab=ctrl+t invert=ctrl+i first=(Home) ;;
     esac

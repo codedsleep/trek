@@ -14,9 +14,9 @@ while [[ $# -gt 0 ]]; do
     case $1 in --out) out=$2; shift 2;; *) shift;; esac
 done
 mkdir -p "$out"
-: >"$out/tallboy.log"
+: >"$out/trek.log"
 : >"$out/session.log"
-[[ ${HARNESS_WARNING:-0} == 0 ]] || echo 'Gtk-WARNING **: simulated regression' >"$out/tallboy.log"
+[[ ${HARNESS_WARNING:-0} == 0 ]] || echo 'Gtk-WARNING **: simulated regression' >"$out/trek.log"
 echo 'PASS assertion before session exit'
 exit "${HARNESS_STATUS:-0}"
 STUB

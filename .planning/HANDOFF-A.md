@@ -3,7 +3,7 @@
 2026-10-13 · Codex · Goal A, Phases 1–4
 
 `SCOPE.md` is the contract. The workspace contains the v1 core and GIO backend,
-headless regression tests, and three examples. `tallboy` is still the linking
+headless regression tests, and three examples. `trek` is still the linking
 stub: the application, installation, screenshots and owner QA belong to Goal B.
 The write guard remains enabled until the Phase 10 sign-off.
 
@@ -18,11 +18,11 @@ From the repository root:
 
 ```sh
 scripts/mkfixture.sh
-TALLBOY_TEST_GVFS=1 scripts/check.sh
+TREK_TEST_GVFS=1 scripts/check.sh
 RUSTDOCFLAGS='-D warnings' cargo doc --workspace --no-deps
-cargo run --release -p tallboy-fs --example fsls -- "$HOME/.cache/tallboy-fixture/big"
-cargo run --release -p tallboy-fs --example jobbench
-cargo run -p tallboy-fs --example volumes
+cargo run --release -p trek-fs --example fsls -- "$HOME/.cache/trek-fixture/big"
+cargo run --release -p trek-fs --example jobbench
+cargo run -p trek-fs --example volumes
 ```
 
 `mkfixture.sh` needs ImageMagick and creates 50,000 files, 500 PNGs, special
@@ -30,7 +30,7 @@ names, symlink cases and permission fixtures. Re-running it leaves existing
 fixtures unchanged. Tests use owned temporary trees; thumbnail acceptance tests
 read its 500 images. `jobbench` creates and removes its own 1 GiB dataset under
 `/tmp` and the fixture. `volumes` only reads inventory. `fsls` accepts a URI too.
-Rustdoc is at `target/doc/tallboy_fs/index.html` and `target/doc/tallboy_core/index.html`.
+Rustdoc is at `target/doc/trek_fs/index.html` and `target/doc/trek_core/index.html`.
 
 Fedora's `/usr/bin/rustfmt` works; the old rustup shim does not. `check.sh`
 selects it when `RUSTFMT` is unset. GTK smoke is visibly skipped until task 5.13;
@@ -59,7 +59,7 @@ Use `gio::File::equal`, rather than Rust object equality, for location identity.
 
 ## Public API as built
 
-All entry points are module-qualified (`tallboy_fs::folder::Folder`, etc.).
+All entry points are module-qualified (`trek_fs::folder::Folder`, etc.).
 Source doc comments define individual fields and errors.
 
 ### Pure core
@@ -84,7 +84,7 @@ Source doc comments define individual fields and errors.
 - `settings_store::Store::load(user_dir, system_dirs, profile)` or
   `from_environment(profile)` exposes mutable `config` and `warnings`.
   `save` atomically writes known settings and retained unknown values to
-  `$XDG_CONFIG_HOME/tallboy/<profile>/tallboy.conf`. System dirs are merged from
+  `$XDG_CONFIG_HOME/trek/<profile>/trek.conf`. System dirs are merged from
   low to high priority, then user settings. Corrupt files are moved aside as
   `.conf.broken` with a collision suffix; a final config symlink is replaced.
   The UI owns live notifications and debounce; run persistence off the main loop
@@ -128,7 +128,7 @@ Source doc comments define individual fields and errors.
   in main: it provides keep-open without a shell for terminals lacking a hold
   flag. The current stub already does this. User command parsing can use
   `glib::shell_parse_argv`; spawning always passes a vector of arguments.
-- `trace::elapsed` logs timing when `TALLBOY_TRACE` is enabled.
+- `trace::elapsed` logs timing when `TREK_TRACE` is enabled.
 
 ### Guarded jobs and single-item operations
 
@@ -167,11 +167,11 @@ Restore reads `trash::orig-path` without UTF-8 loss. Confirm permanent deletion
 in the UI; only an explicit DeleteInstead answer permits trash fallback.
 
 Default allowed roots are the fixture, build `target/tmp`, and system temp.
-`TALLBOY_ALLOW_ROOTS` adds native paths or URI prefixes separated by semicolons
+`TREK_ALLOW_ROOTS` adds native paths or URI prefixes separated by semicolons
 or newlines. Trash requires XDG_DATA_HOME beneath an allowed root. Isolated Goal B
 runs must add both the original fixture and their isolated XDG tree explicitly,
 since changing XDG_CACHE_HOME changes the default fixture root. Agents must
-never set `TALLBOY_UNLOCKED`. Parent symlinks are resolved for guard checks;
+never set `TREK_UNLOCKED`. Parent symlinks are resolved for guard checks;
 user-file operations themselves all use GIO. The guard is a development safety
 boundary, not a substitute for the Phase 7/10 data-loss reviews.
 

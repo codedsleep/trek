@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Builds tallboy in release mode and installs it for this user, beside
+# Builds trek in release mode and installs it for this user, beside
 # PCManFM (DISCOVERY D21, D27).
 #
 #   scripts/install.sh                 binary, launcher, icon, man page
-#   scripts/install.sh --set-default   also: open folders with tallboy, and
+#   scripts/install.sh --set-default   also: open folders with trek, and
 #                                      answer "Show in folder" (FileManager1)
 #   scripts/install.sh --uninstall     remove what was installed
 #   scripts/install.sh --prefix DIR    install under DIR instead of ~/.local
@@ -12,7 +12,7 @@
 # `xdg-mime query default inode/directory` answers as before.
 #
 # The build that is installed is still locked: it changes files only inside
-# its test folders and those named in TALLBOY_ALLOW_ROOTS (see README.md).
+# its test folders and those named in TREK_ALLOW_ROOTS (see README.md).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 prefix="$HOME/.local"
@@ -28,11 +28,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-id=io.github.codedsleep.Tallboy
-bin="$prefix/bin/tallboy"
+id=io.github.codedsleep.Trek
+bin="$prefix/bin/trek"
 launcher="$prefix/share/applications/$id.desktop"
 icon="$prefix/share/icons/hicolor/scalable/apps/$id.svg"
-manual="$prefix/share/man/man1/tallboy.1"
+manual="$prefix/share/man/man1/trek.1"
 service="$prefix/share/dbus-1/services/org.freedesktop.FileManager1.service"
 
 refresh() {
@@ -51,23 +51,23 @@ if [[ $uninstall == 1 ]]; then
     refresh
     if command -v xdg-mime >/dev/null \
         && [[ $(xdg-mime query default inode/directory) == "$id.desktop" ]]; then
-        echo "tallboy is still named as the handler for folders; choose another with:"
+        echo "trek is still named as the handler for folders; choose another with:"
         echo "  xdg-mime default pcmanfm.desktop inode/directory"
     fi
     exit 0
 fi
 
-cargo build --manifest-path "$root/Cargo.toml" --release --locked -p tallboy
+cargo build --manifest-path "$root/Cargo.toml" --release --locked -p trek
 
-install -Dm755 "$root/target/release/tallboy" "$bin"
+install -Dm755 "$root/target/release/trek" "$bin"
 # The launcher names the binary by its full path, so that it works even when
 # the prefix's bin directory is not on the desktop session's PATH.
 install -d "$(dirname "$launcher")"
-sed -e "s|^TryExec=.*|TryExec=$bin|" -e "s|^Exec=tallboy|Exec=$bin|" \
+sed -e "s|^TryExec=.*|TryExec=$bin|" -e "s|^Exec=trek|Exec=$bin|" \
     "$root/data/$id.desktop" >"$launcher"
 chmod 644 "$launcher"
-install -Dm644 "$root/data/tallboy.svg" "$icon"
-install -Dm644 "$root/data/tallboy.1" "$manual"
+install -Dm644 "$root/data/trek.svg" "$icon"
+install -Dm644 "$root/data/trek.1" "$manual"
 refresh
 echo "installed $bin"
 echo "installed $launcher"
@@ -81,10 +81,10 @@ if [[ $set_default == 1 ]]; then
     chmod 644 "$service"
     echo "installed $service"
     xdg-mime default "$id.desktop" inode/directory
-    echo "folders now open with tallboy (before: ${before:-nothing})"
+    echo "folders now open with trek (before: ${before:-nothing})"
     if [[ -n $before && $before != "$id.desktop" ]]; then
         echo "to go back:  xdg-mime default $before inode/directory"
     fi
 else
-    echo "defaults unchanged; run with --set-default to open folders with tallboy"
+    echo "defaults unchanged; run with --set-default to open folders with trek"
 fi

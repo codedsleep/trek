@@ -41,7 +41,7 @@ File references and recommendations are in CODE-REVIEW. Existing GIO path-swap r
 |---|---|
 | `scripts/check.sh` | Green after all code changes: fmt, clippy all targets, workspace tests with fatal GLib criticals, layering, runner regression, GTK smoke and explicit recycled-tree test |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --workspace --no-deps` | Green |
-| `TALLBOY_TEST_GVFS=1 G_DEBUG=fatal-criticals cargo test -p tallboy-fs --test trash` | Three tests pass, actual private-bus GVFS trash/restore/empty exercised |
+| `TREK_TEST_GVFS=1 G_DEBUG=fatal-criticals cargo test -p trek-fs --test trash` | Three tests pass, actual private-bus GVFS trash/restore/empty exercised |
 | Original full 14-script UI suite | 200 functional assertions passed. Strengthened diagnostic gate correctly rejected a negative-size GTK warning in drag; fixed afterward |
 | Final changed-path UI run | Properties 13, drag 17, sidepane 15, menu/session 11: 56 assertions pass, no toolkit warnings, zero live counters. Other unchanged scripts passed the full run. The current default suite contains 216 assertions; a single final 216-assertion run is not claimed |
 | Release benchmarks | SCOPE §11 records calibrated startup, shown-window large listing/sort, memory, copy and thumbnails with misses/limits |

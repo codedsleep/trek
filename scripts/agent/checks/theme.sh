@@ -1,7 +1,7 @@
 # The desktop's GTK theme (SCOPE §10, deviation 10). A theme is read once, at
 # start-up, so run-all.sh makes the themes and starts a session for each:
-#   THEME_CASE=gtk3 scripts/agent-run.sh --env TALLBOY_GTK_THEME=TallboyThree \
-#       -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/theme.sh
+#   THEME_CASE=gtk3 scripts/agent-run.sh --env TREK_GTK_THEME=TrekThree \
+#       -- ~/.cache/trek-fixture/names < scripts/agent/checks/theme.sh
 # Colours are read off the screen: the empty part of the folder area, the
 # cursor's row and the status line.
 pixel() { grim -g "$1,$2 1x1" -t ppm - | tail -c 3 | od -An -tu1 | xargs; }
@@ -39,4 +39,4 @@ case $THEME_CASE in
         check "the cursor is GTK's" test "$cursor" = "21 83 158"
         ;;
 esac
-check "nothing was logged as a warning" test -z "$(grep -E 'WARNING|CRITICAL' "$OUT/tallboy.log")"
+check "nothing was logged as a warning" test -z "$(grep -E 'WARNING|CRITICAL' "$OUT/trek.log")"

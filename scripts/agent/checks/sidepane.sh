@@ -1,7 +1,7 @@
 # The side pane: Places, bookmarks and the Directory Tree (SCOPE 8.2–8.6).
-#   scripts/agent-run.sh -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/sidepane.sh
+#   scripts/agent-run.sh -- ~/.cache/trek-fixture/names < scripts/agent/checks/sidepane.sh
 # The bookmarks file is the agent profile's own ($XDG_CONFIG_HOME/gtk-3.0).
-F=$HOME/.cache/tallboy-fixture
+F=$HOME/.cache/trek-fixture
 B=$XDG_CONFIG_HOME/gtk-3.0/bookmarks
 mkdir -p "$(dirname "$B")"; : >"$B"
 at() { has "$(state)" "location=file://$1 "; }
@@ -37,7 +37,7 @@ check "a click on Trash Can opens the trash" has "$(state)" 'location=trash:///'
 echo "--- directory tree"
 act sidepane-mode "'dirtree'"; settle 0.6
 act go-to "'$F/deep/level-00/level-01'"; settle 2; shot tree
-check "the tree expands down to the folder, through a hidden one" has "$(state)" 'tree=\[[^]]*">.cache"[^]]*">>tallboy-fixture"[^]]*">>>deep", ">>>>level-00", ">>>>>level-01"'
+check "the tree expands down to the folder, through a hidden one" has "$(state)" 'tree=\[[^]]*">.cache"[^]]*">>trek-fixture"[^]]*">>>deep", ">>>>level-00", ">>>>>level-01"'
 check "a row is selected" bash -c '[[ "$1" != *"tree_selected=-1"* ]]' _ "$(state)"
 mkdir -p "$F/deep/level-00/zz-new"; settle 1.5
 check "a folder created outside appears under its expanded parent" has "$(state)" '">>>>>zz-new"'

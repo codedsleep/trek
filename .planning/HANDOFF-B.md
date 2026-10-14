@@ -2,7 +2,7 @@
 
 Claude · Goal B, Phases 5–9 · started 2026-10-13
 
-**Status: complete, 2026-10-13.** Goal B, Phases 5–9, is finished and pushed; the five owner checkpoints in `QA.md` are open. The build is still locked (`fs::guard`), and nothing in Goal B set `TALLBOY_UNLOCKED`.
+**Status: complete, 2026-10-13.** Goal B, Phases 5–9, is finished and pushed; the five owner checkpoints in `QA.md` are open. The build is still locked (`fs::guard`), and nothing in Goal B set `TREK_UNLOCKED`.
 
 `SCOPE.md` §10–§13 hold the deviations, measurements, decisions and the per-phase log; `QA.md` holds what was checked and how. This file is what Goal C needs on top of those.
 
@@ -16,7 +16,7 @@ Each was made under SCOPE §2 rule 2: smallest change that unblocks, with a test
 | 2 | `67ffbd2` | fs | Folder listing and monitor re-queries follow symbolic links (`FileQueryInfoFlags::NONE`) | A link to a folder was listed as an `inode/symlink` file: sorted with files, could not be entered, missing from the directory tree. `symlink` and `symlink_target` still identify the link; a broken link keeps the `SymbolicLink` type. Job traversal is untouched and never follows links | `folder::listing_follows_symlinks_for_display_metadata` |
 | 3 | `e678996` | core, fs | `sort::SortFacts` and `compare_facts`; `FileMeta` drops `sort_keys` for `sort_facts()`; content type, description, icon, owner, group and filesystem strings become `Arc<str>` shared through `meta::intern` | 2.1 KiB per listed file missed the 15 MB per 10,000 files budget (R6). Now 10.1 MiB | `meta::metadata_variants` |
 | 4 | `524873a` | core | `History::entries`, `index`, `go_to` | The Back/Forward history menu | `history::tests::menu_jump` |
-| 5 | `b565fa6` | fs | `delete` does not descend below `trash://` items | Finding 2 below | `trash::gvfs_trash_subprocess` (needs `TALLBOY_TEST_GVFS=1`) |
+| 5 | `b565fa6` | fs | `delete` does not descend below `trash://` items | Finding 2 below | `trash::gvfs_trash_subprocess` (needs `TREK_TEST_GVFS=1`) |
 | 6 | `9cd78b7` | fs | `Question::Conflict::can_overwrite`; `JobError::ReplaceFolder`; a remembered Overwrite is not applied when the destination is a folder and the source is not | Finding 1 below | `jobs::a_file_never_replaces_a_folder`, `jobs::a_folder_may_replace_a_file_and_keeps_its_source` |
 | 7 | `43acaa1` | fs | `NotSupported` from `copy_attributes` on a folder is not recorded as a warning | GLib applies mode and times and then reports the read-only `standard::size`; every copied folder carried a spurious metadata warning | `jobs::copying_a_folder_keeps_its_mode_and_time_without_a_warning` |
 | 8 | `8e551f8` | fs | `FileMeta::from_info` checks every attribute before reading it; unreported access rights are assumed except execute | The typed getters log a critical or, for `edit_name`, panic on a missing attribute; the trash root has no edit name or size, and nothing obliges a remote backend to report everything. With `panic = "abort"` that ended the process | `meta::sparse_info_from_a_backend_is_not_fatal` |
@@ -25,7 +25,7 @@ Each was made under SCOPE §2 rule 2: smallest change that unblocks, with a test
 
 Patch 3 changes public field types of `FileMeta`; patch 6 adds a field to a public enum variant and replaces the test `overwrite_between_file_and_directory_keeps_source_and_publishes_complete_item`, which asserted the behaviour finding 1 removes. Those two deserve the closest look.
 
-The workspace `Cargo.toml` was not touched. The `tallboy` crate adds `glib-unix` and the `gio/v2_80` and `glib/log` features in its own manifest (SCOPE §11).
+The workspace `Cargo.toml` was not touched. The `trek` crate adds `glib-unix` and the `gio/v2_80` and `glib/log` features in its own manifest (SCOPE §11).
 
 ## 2. Task 7.1 — data-loss review of `fs::jobs` and `fs::guard`
 
@@ -52,7 +52,7 @@ Read as a reviewer on 2026-10-13: `guard.rs`, `jobs/{mod,engine,walk,operations,
 3. **Path-based traversal can be raced.** Between `info` saying "directory" and `children` enumerating it, another process can swap the directory for a symbolic link; the walk then continues through the link. This is the classic recursive-delete race and is inherent to walking by path with GIO (no `openat`). While the build is locked the per-entry guard check still refuses anything that resolves outside the allowed roots. After the guard is removed nothing does. Upstream has the same exposure. Worth one line in the README's safety notes rather than an attempt to fix.
 4. **An error inside a folder abandons the rest of that top-level item.** `transfer_to`, `delete` and `attrs` propagate a child's error with `?` up to `Runner::run`, which asks Retry / Skip for the *top-level* source. Skip leaves the remaining children of that folder unprocessed (for a move, still safely in the source). Upstream asks per file and carries on. Copying a folder that contains one unreadable file therefore stops at that file. A per-entry ask-and-continue loop would fix it; I did not make that change inside a safety-critical engine without Codex.
 5. **Retry after a mid-folder copy error re-asks conflicts** for the files the first attempt already copied, because the destination folder now exists and is merged. Safe, noisy.
-6. **A kill or crash mid-copy leaves a hidden `.tallboy-copy-<pid>-<n>` file** in the destination folder. `panic = "abort"` makes this possible. Nothing cleans these up later.
+6. **A kill or crash mid-copy leaves a hidden `.trek-copy-<pid>-<n>` file** in the destination folder. `panic = "abort"` makes this possible. Nothing cleans these up later.
 7. **Recursive chmod applies children before the folder.** Removing read permission works; *adding* search permission to a tree that lacks it fails at the first level. Non-destructive.
 8. **Copy sources are guard-checked like move sources**, so while locked the owner cannot copy *from* a real folder *into* the fixture. Stricter than D13 needs; it only matters for QA, and QA.md says so.
 9. **`Policy::from_environment` bakes `CARGO_MANIFEST_DIR/../../target/tmp` in at compile time.** Harmless for a build that is run in place, meaningless once installed; goes away with the guard.
@@ -80,7 +80,7 @@ The first frame of any window costs one pause of 120–150 ms that the empty bas
 
 `QA.md` has one section per phase with every item marked test, agent or hand. In short:
 
-- **By test.** `scripts/check.sh`: format, clippy with warnings denied, the workspace's tests, the GVFS trash test when `TALLBOY_TEST_GVFS=1`, and a start-up smoke run. Goal B added tests only where it patched the backend (§1) and for pure UI-side logic: the action table (unique names and accelerators), the profile pre-scan, Connect to Server URIs, owner and group lookup, type-ahead, path completion and the view's item index. The GTK code itself has no unit tests; it is covered by the agent checks.
+- **By test.** `scripts/check.sh`: format, clippy with warnings denied, the workspace's tests, the GVFS trash test when `TREK_TEST_GVFS=1`, and a start-up smoke run. Goal B added tests only where it patched the backend (§1) and for pure UI-side logic: the action table (unique names and accelerators), the profile pre-scan, Connect to Server URIs, owner and group lookup, type-ahead, path completion and the view's item index. The GTK code itself has no unit tests; it is covered by the agent checks.
 - **By agent.** `scripts/agent/checks/run-all.sh` runs 14 scripts, 200 assertions, in a headless compositor with real keyboard and pointer input (`scripts/agent/vinput`), a private D-Bus session and isolated XDG folders. All pass at the head of the branch:
 
   | Script | Assertions | Covers |
@@ -115,7 +115,7 @@ In order of how much a defect would cost.
 6. **`view/thumbs.rs`.** A result is matched to its cell by a ticket; the texture cache is bounded by an *estimate* of bytes (width × height × 4).
 7. **`sidepane/dirtree.rs`.** The listing task is aborted on collapse, reload and dispose. Before this it leaked a folder monitor per collapsed row; `leaks.sh` now guards it, but only for the paths that script walks.
 8. **`dialogs/prefs.rs` and `Settings::import`.** Handlers are disconnected when the window closes; `import` calls every registered handler once per registration, which rebuilds open views several times. Harmless, wasteful.
-9. **`filemanager1.rs`.** The `TALLBOY_FILEMANAGER1` override, and that `ShowItems` selects one item per folder.
+9. **`filemanager1.rs`.** The `TREK_FILEMANAGER1` override, and that `ShowItems` selects one item per folder.
 10. **Line counts.** The crate is 14,152 lines. `window/mod.rs` (876) is the largest file and would split along the seams its sections already mark: panes, tabs, settings, enablement. `dialogs/prefs.rs` (704) is long because each control is spelled out.
 
 Known and accepted, not asking for review: deviations 12–15 (GTK 4 list widgets and Wayland drag semantics), the `/usr/bin` budget (backend, task 10.6), and that the guard's allowed roots include the system temporary directory.

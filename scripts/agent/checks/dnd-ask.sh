@@ -1,9 +1,9 @@
 # drop_default_action=ask (SCOPE 7.11). The setting has no control until the
 # Preferences dialog exists, so seed the profile and keep it:
-#   C=~/.cache/tallboy-agent/config/tallboy/agent; mkdir -p $C
-#   printf '[config]\ndrop_default_action=ask\n' >$C/tallboy.conf
-#   scripts/agent-run.sh --keep -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/dnd-ask.sh
-D=$(mktemp -d "$HOME/.cache/tallboy-agent/dnd-XXXXXX")
+#   C=~/.cache/trek-agent/config/trek/agent; mkdir -p $C
+#   printf '[config]\ndrop_default_action=ask\n' >$C/trek.conf
+#   scripts/agent-run.sh --keep -- ~/.cache/trek-fixture/names < scripts/agent/checks/dnd-ask.sh
+D=$(mktemp -d "$HOME/.cache/trek-agent/dnd-XXXXXX")
 mkdir "$D/dest1"; echo a >"$D/a.txt"; echo b >"$D/b.txt"
 act go-to "'$D'"; settle 0.8
 # Order: dest1 a.txt b.txt

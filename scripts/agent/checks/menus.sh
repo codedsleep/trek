@@ -1,6 +1,6 @@
 # Context menus and the trash can (SCOPE 8.1, 8.7). Run with:
-#   scripts/agent-run.sh -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/menus.sh
-M=$(mktemp -d "$HOME/.cache/tallboy-agent/menus-XXXXXX")
+#   scripts/agent-run.sh -- ~/.cache/trek-fixture/names < scripts/agent/checks/menus.sh
+M=$(mktemp -d "$HOME/.cache/trek-agent/menus-XXXXXX")
 mkdir "$M/folder"; printf 'one\n' >"$M/a.txt"; printf 'two\n' >"$M/b.txt"; printf 'in\n' >"$M/folder/inner.txt"
 col() { echo $((222 + 141 * $1)); }
 gio trash --empty 2>/dev/null || true      # the agent profile's own trash
@@ -29,8 +29,8 @@ vin move "$(col 0)" 145 click; vin key Delete; settle 0.5; vin key Return; settl
 check "a file and a folder went to the trash" test ! -e "$M/a.txt" -a ! -e "$M/folder"
 act go-trash; settle 1.2; shot trash
 check "the trash can lists them" has "$(state)" 'visible=2'
-check "Create New is disabled in the trash" bash -c "! (gdbus call --session --dest io.github.codedsleep.Tallboy.p_agent --object-path /io/github/codedsleep/Tallboy/p_agent/window/1 --method org.gtk.Actions.Describe create-folder | grep -q '^((true')"
-check "Move to Trash is not an action in the trash" bash -c "gdbus call --session --dest io.github.codedsleep.Tallboy.p_agent --object-path /io/github/codedsleep/Tallboy/p_agent/window/1 --method org.gtk.Actions.Describe trash 2>&1 | grep -qi 'error\|No such'"
+check "Create New is disabled in the trash" bash -c "! (gdbus call --session --dest io.github.codedsleep.Trek.p_agent --object-path /io/github/codedsleep/Trek/p_agent/window/1 --method org.gtk.Actions.Describe create-folder | grep -q '^((true')"
+check "Move to Trash is not an action in the trash" bash -c "gdbus call --session --dest io.github.codedsleep.Trek.p_agent --object-path /io/github/codedsleep/Trek/p_agent/window/1 --method org.gtk.Actions.Describe trash 2>&1 | grep -qi 'error\|No such'"
 vin move "$(col 0)" 145 click right; settle 0.5; shot menu-trash; vin key Escape; settle 0.3
 act select-all; act restore; settle 1.5
 check "Restore puts both back where they were, with contents" test -f "$M/a.txt" -a -f "$M/folder/inner.txt"

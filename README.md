@@ -1,4 +1,4 @@
-# tallboy
+# trek
 
 A graphical file manager driven from the keyboard with the keys of
 [Yazi](https://yazi-rs.github.io): `h` `j` `k` `l` to move, `y` `x` `p` to
@@ -163,9 +163,9 @@ is `/` now.
 - **Thumbnails** for images, in the cache other programs share.
 - **Integration.** One instance per profile, daemon mode, the
   `org.freedesktop.FileManager1` service ("Show in folder"), and an importer
-  for PCManFM's settings (`tallboy --import-pcmanfm`).
+  for PCManFM's settings (`trek --import-pcmanfm`).
 
-`man tallboy` lists the command-line options.
+`man trek` lists the command-line options.
 
 ## Building
 
@@ -177,7 +177,7 @@ Fedora packages:
 At run time it wants `gvfs` with the backends you use (`gvfs-smb`, `gvfs-mtp`,
 `gvfs-fuse` and so on), `udisks2`, `shared-mime-info` and an icon theme.
 
-    cargo build --release -p tallboy     # the binary is target/release/tallboy
+    cargo build --release -p trek        # the binary is target/release/trek
     scripts/check.sh                     # format, lints, tests, a start-up smoke test
 
 Rust 1.92 or later; GTK 4.14 or later (developed against 4.22).
@@ -185,33 +185,33 @@ Rust 1.92 or later; GTK 4.14 or later (developed against 4.22).
 ### Installing
 
     scripts/install.sh                   # into ~/.local, beside PCManFM
-    scripts/install.sh --set-default     # also open folders with tallboy
+    scripts/install.sh --set-default     # also open folders with trek
     scripts/install.sh --uninstall
 
 A plain install adds the binary, a launcher, the icon and the man page and
 changes no default: folders keep opening with whatever opened them before.
-`--set-default` makes tallboy the handler for folders, installs the D-Bus
+`--set-default` makes trek the handler for folders, installs the D-Bus
 service file that lets other programs ask it to show a file, and prints the
 command that undoes the first of those.
 
 ### Trying it without touching your settings
 
-    scripts/mkfixture.sh                 # test folders under ~/.cache/tallboy-fixture
-    scripts/dev-run.sh                   # tallboy on the fixture, with its own settings
+    scripts/mkfixture.sh                 # test folders under ~/.cache/trek-fixture
+    scripts/dev-run.sh                   # trek on the fixture, with its own settings
 
 `dev-run.sh` uses its own D-Bus session and its own configuration, cache and
-data folders under `~/.cache/vim-centric-fm-dev`, so its bookmarks, trash can
+data folders under `~/.cache/trek-dev`, so its bookmarks, trash can
 and default applications are not yours. What it starts — the terminal, the
-editor, applications — runs with your own settings: the script hands tallboy
-your folders and session bus as `TALLBOY_HOST_*`, and tallboy gives them back
+editor, applications — runs with your own settings: the script hands trek
+your folders and session bus as `TREK_HOST_*`, and trek gives them back
 to every program it starts.
 
 ### Coming from PCManFM
 
-    tallboy --import-pcmanfm
+    trek --import-pcmanfm
 
 reads `~/.config/pcmanfm/default/pcmanfm.conf` and `~/.config/libfm/libfm.conf`,
-takes over every setting tallboy also has, and prints what it imported and
+takes over every setting trek also has, and prints what it imported and
 what it left. It changes neither file and is never run for you.
 
 ## The safety lock
@@ -221,55 +221,55 @@ Phase 10 has been signed off, every operation that changes files — copy, move,
 link, trash, delete, rename, create, changing permissions — is refused unless
 all of its sources and its destination lie inside:
 
-- the test fixture, `~/.cache/tallboy-fixture`;
+- the test fixture, `~/.cache/trek-fixture`;
 - the system's temporary directory (`/tmp`) and the build's own `target/tmp`,
   which the tests use;
-- any folder named in `TALLBOY_ALLOW_ROOTS` (`scripts/dev-run.sh` names its
+- any folder named in `TREK_ALLOW_ROOTS` (`scripts/dev-run.sh` names its
   own data folder this way).
 
-Everywhere else tallboy browses, opens files and mounts volumes as usual, and
+Everywhere else trek browses, opens files and mounts volumes as usual, and
 tells you why when it refuses a change.
 
 To let it work in one more place, name it when starting — several are
 separated by semicolons, and a remote folder is given as a URI:
 
-    TALLBOY_ALLOW_ROOTS=/run/media/$USER/STICK tallboy
-    TALLBOY_ALLOW_ROOTS='/mnt/scratch;smb://nas/share/tmp' tallboy
+    TREK_ALLOW_ROOTS=/run/media/$USER/STICK trek
+    TREK_ALLOW_ROOTS='/mnt/scratch;smb://nas/share/tmp' trek
 
-The trash can is only usable when tallboy's data folder is itself inside an
+The trash can is only usable when trek's data folder is itself inside an
 allowed folder, as it is under `scripts/dev-run.sh`.
 
 **Unlocking.** The lock is not a setting. It is removed from the source when
 the review is signed off, and the release that follows (`v1.0.0`) has none.
-The code does have an override for that review, `TALLBOY_UNLOCKED=1`, which
+The code does have an override for that review, `TREK_UNLOCKED=1`, which
 switches every check off; using it before the sign-off means trusting an
 unreviewed copy and delete engine with your files.
 
 Two things the lock does not cover and the review will not change:
 
-- **Recursive operations follow paths, not open folders.** While tallboy is
+- **Recursive operations follow paths, not open folders.** While trek is
   deleting or copying a folder tree, another program that swaps a folder in
   that tree for a symbolic link can redirect the rest of the operation. PCManFM
   and most file managers share this. Do not run a recursive delete in a folder
   that another user or an untrusted program can write to.
 - **A crash or kill in the middle of a copy** can leave a hidden file named
-  `.tallboy-copy-…` beside the destination. It is safe to delete.
+  `.trek-copy-…` beside the destination. It is safe to delete.
 
 ## Hyprland and Wayland notes
 
-- The application id is `io.github.codedsleep.Tallboy` (with `--profile NAME`:
-  `io.github.codedsleep.Tallboy.p_NAME`), for window rules. Dialogs are
+- The application id is `io.github.codedsleep.Trek` (with `--profile NAME`:
+  `io.github.codedsleep.Trek.p_NAME`), for window rules. Dialogs are
   transient windows and float without a rule. A key binding:
-  `bind = $mainMod, E, exec, tallboy`.
-- An application started from tallboy is handed an activation token, so its
+  `bind = $mainMod, E, exec, trek`.
+- An application started from trek is handed an activation token, so its
   window takes the focus.
 - **The clipboard is the compositor's.** Files you cut or copy stay on the
-  clipboard only while a tallboy window exists. Close the last window before
+  clipboard only while a trek window exists. Close the last window before
   pasting and the cut or copy is gone, unless a clipboard manager is running.
   This is true of every GTK 4 program.
 - **Modifier keys during a drag.** On Wayland the program you drop on decides
-  between copy, move and link. tallboy reads Ctrl and Shift itself, so they
-  work for drags inside tallboy and for drops onto tallboy while its window
+  between copy, move and link. trek reads Ctrl and Shift itself, so they
+  work for drags inside trek and for drops onto trek while its window
   has the keyboard; other programs may ignore them.
 - Mounting an internal disk needs a polkit agent running in the session.
   "Remember forever" for a network password needs a secret service
@@ -277,12 +277,12 @@ Two things the lock does not cover and the review will not change:
   password is kept for the session at most.
 - Fractional scaling is handled: thumbnails are requested at the size the
   monitor's scale needs.
-- There is no desktop manager: tallboy does not draw a wallpaper or desktop
+- There is no desktop manager: trek does not draw a wallpaper or desktop
   icons, and `--desktop` says so.
 - It is dark, in the colours of the desktop's GTK theme. A theme with a
   GTK 4 part is loaded by GTK, in its dark variant when it has one. A theme
   written for GTK 3 only, which is what PCManFM draws with, cannot be loaded
-  by GTK 4: tallboy then takes the colours the theme names (`@define-color
+  by GTK 4: trek then takes the colours the theme names (`@define-color
   theme_bg_color` and the rest) and recolours GTK 4's own stylesheet with
   them. The palette is the theme's; the shapes and spacing of buttons, tabs
   and menus stay GTK 4's. The theme is read at start-up, so a change of
@@ -311,9 +311,9 @@ in `.planning/SCOPE.md` §10, in the same order.
 12. Compact view columns are all the same width and long names are ellipsised; upstream fits each column to its longest name. GTK 4's `GridView` has uniform cells
 13. The selection highlight covers the whole grid cell, as GTK 4 themes draw it, not only the icon and name
 14. A press on the padding around an item selects it on release, and a drag from there starts a rubber band; upstream deselects and rubber-bands from the gaps only
-15. During a drag, Ctrl, Shift and Ctrl+Shift are read from the keyboard by the destination. For a drag that starts in another program they are only seen while tallboy's window has the keyboard, and a link can only be made by tallboy as the destination. Wayland has no link action and sources do not narrow their offer
+15. During a drag, Ctrl, Shift and Ctrl+Shift are read from the keyboard by the destination. For a drag that starts in another program they are only seen while trek's window has the keyboard, and a link can only be made by trek as the destination. Wayland has no link action and sources do not narrow their offer
 16. Preparation errors stop the whole job; an execution error on one child ends that top-level folder’s copy, move, delete or attribute change. Skip abandons its remaining children; Retry repeats completed entries and conflicts. Upstream asks per file
-17. A kill or crash in mid-copy can leave a hidden `.tallboy-copy-*` file beside the destination; upstream leaves the partial destination file instead
+17. A kill or crash in mid-copy can leave a hidden `.trek-copy-*` file beside the destination; upstream leaves the partial destination file instead
 18. A folder dropped on the empty part of Places becomes a bookmark. Dropping exactly *between* two bookmarks is not told apart from dropping *on* one, which puts the files into that folder; files cannot be dropped on the Trash Can row
 19. The directory tree shows a hidden folder that lies on the way to the current folder even when hidden files are off, so the current folder can always be seen in it
 20. Owner and group names in Properties are looked up in `/etc/passwd` and `/etc/group`; an account known only to a directory service must be given as a number
@@ -324,15 +324,15 @@ in `.planning/SCOPE.md` §10, in the same order.
 25. Passwords embedded in a location’s userinfo are rejected; credentials must be entered through the mount prompt
 26. Recursive permission changes prepare the tree and visit children before parents; an inaccessible subtree cannot be repaired by granting access recursively
 27. A listing error after an initial batch leaves the partial view in Loading; partial-result error presentation awaits an owner decision
-28. Text files open in the editor (`$VISUAL`, then `$EDITOR`, then `nvim`) in the terminal, whatever application is set for their type; that includes executable scripts, which are no longer offered for execution unless `quick_exec=1`. Pictures written in XML (SVG) keep their applications. An application with `Terminal=true` is started in tallboy's terminal, not one from GIO's list
+28. Text files open in the editor (`$VISUAL`, then `$EDITOR`, then `nvim`) in the terminal, whatever application is set for their type; that includes executable scripts, which are no longer offered for execution unless `quick_exec=1`. Pictures written in XML (SVG) keep their applications. An application with `Terminal=true` is started in trek's terminal, not one from GIO's list
 
 ## Layout of the source
 
 | Crate | What it is |
 |---|---|
-| `crates/tallboy-core` | Pure logic: locations, sorting, naming, the settings model, command-line parsing. No I/O. |
-| `crates/tallboy-fs` | Everything that touches files through GIO: folder listing and monitoring, the job engine and its guard, trash, volumes, thumbnails, bookmarks. No GTK. |
-| `crates/tallboy` | The GTK 4 application. |
+| `crates/trek-core` | Pure logic: locations, sorting, naming, the settings model, command-line parsing. No I/O. |
+| `crates/trek-fs` | Everything that touches files through GIO: folder listing and monitoring, the job engine and its guard, trash, volumes, thumbnails, bookmarks. No GTK. |
+| `crates/trek` | The GTK 4 application. |
 
 `.planning/` holds the specification (`PROMPT.md`), the decisions
 (`DISCOVERY.md`), the plan and its log (`SCOPE.md`), and what was checked and

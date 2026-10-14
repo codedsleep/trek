@@ -1,12 +1,12 @@
 # Opening files (SCOPE 6.12–6.16). Run with:
-#   scripts/agent-run.sh --env TERMINAL=$HOME/.cache/tallboy-agent/opening/bin/fake-term \
-#       --env VISUAL=$HOME/.cache/tallboy-agent/opening/bin/fake-edit \
-#       --env TALLBOY_HOST_XDG_CONFIG_HOME=$HOME/.cache/tallboy-agent/opening/host-config \
-#       -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/opening.sh
+#   scripts/agent-run.sh --env TERMINAL=$HOME/.cache/trek-agent/opening/bin/fake-term \
+#       --env VISUAL=$HOME/.cache/trek-agent/opening/bin/fake-edit \
+#       --env TREK_HOST_XDG_CONFIG_HOME=$HOME/.cache/trek-agent/opening/host-config \
+#       -- ~/.cache/trek-fixture/names < scripts/agent/checks/opening.sh
 # Applications, the terminal and the editor are stand-ins; the applications
 # and the terminal append their arguments to $OUT/launch.log.
-F=$HOME/.cache/tallboy-fixture
-work=$HOME/.cache/tallboy-agent/opening
+F=$HOME/.cache/trek-fixture
+work=$HOME/.cache/trek-agent/opening
 rm -rf "$work"; mkdir -p "$work/bin" "$work/files" "$XDG_DATA_HOME/applications"
 : >"$OUT/launch.log"
 cat >"$work/bin/record" <<SH
@@ -15,7 +15,7 @@ cat >"$work/bin/record" <<SH
 SH
 # What a started program finds in its environment, apart from the launch log.
 cat >>"$work/bin/record" <<SH
-printf '%s config=%s host=%s\n' "\$TB_APP" "\$XDG_CONFIG_HOME" "\${TALLBOY_HOST_XDG_CONFIG_HOME-unset}" >>"$work/environment"
+printf '%s config=%s host=%s\n' "\$TB_APP" "\$XDG_CONFIG_HOME" "\${TREK_HOST_XDG_CONFIG_HOME-unset}" >>"$work/environment"
 SH
 # The terminal records what it was asked to run, and where it was started.
 cat >"$work/bin/fake-term" <<SH
@@ -52,7 +52,7 @@ printf '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"/>\n' >"$wor
 printf '#include <fcntl.h>\nint main(void) { return creat("program-ran", 0644) < 0; }\n' | cc -x c - -o "$work/files/program"
 # Bytes no content test takes for a known type. Random ones are, now and
 # then: 64 from /dev/urandom have come out as text/x-matlab.
-printf '\0\1\2\3tallboy\0\377\376\0\0' >"$work/files/data.tbunknown"
+printf '\0\1\2\3trek\0\377\376\0\0' >"$work/files/data.tbunknown"
 printf '[Desktop Entry]\nType=Application\nName=Loose launcher\nExec=touch %s/launcher-ran\n' "$work" >"$work/files/loose.desktop"
 log() { cat "$OUT/launch.log"; }
 loc() { state | grep -o 'location=[^ ]*'; }
@@ -86,7 +86,7 @@ only "*.svg"; act open; settle 1.2
 check "a picture written in XML goes to its application" has "$(log)" 'app=image argc=1'
 check "and not to the editor" test "$(log | grep -c app=term)" = 0
 
-echo "--- an application that needs a terminal gets tallboy's"
+echo "--- an application that needs a terminal gets trek's"
 : >"$OUT/launch.log"
 only "pic*"; act open-with-app "'tb-console.desktop'"; settle 1.2
 check "the terminal was asked to run it with the file" has "$(log | tr -d '\n')" "app=term argc=5 .*arg=\[-e\]  arg=\[env\]  arg=\[TB_APP=console\]  arg=\[$work/bin/record\]  arg=\[$work/files/pic.png\]"
@@ -120,11 +120,11 @@ only "*"
 
 echo "--- command line: a file and a folder, relative to the caller"
 : >"$OUT/launch.log"
-(cd "$work" && tallboy files/one.txt files) ; settle 1.2
+(cd "$work" && trek files/one.txt files) ; settle 1.2
 check "the file went to the editor" has "$(log)" "arg=\[$work/files/one.txt\]"
 check "the folder opened as a second tab" has "$(state)" 'tabs=2'
 vin key ctrl+w; settle 0.3
-(cd "$work" && tallboy -n files); settle 1
+(cd "$work" && trek -n files); settle 1
 check "-n opened a second window" test "$(WIN=2 state | grep -c location=)" = 1
 
 echo "--- Open With sets the default application"

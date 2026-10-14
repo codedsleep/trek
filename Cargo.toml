@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/tallboy-core", "crates/tallboy-fs", "crates/tallboy"]
+members = ["crates/trek-core", "crates/trek-fs", "crates/trek"]
 resolver = "3"
 
 [workspace.package]
@@ -9,8 +9,8 @@ license = "GPL-2.0-or-later"
 rust-version = "1.92"
 
 [workspace.dependencies]
-tallboy-core = { path = "crates/tallboy-core" }
-tallboy-fs = { path = "crates/tallboy-fs" }
+trek-core = { path = "crates/trek-core" }
+trek-fs = { path = "crates/trek-fs" }
 gtk = { package = "gtk4", version = "=0.11.5", features = ["v4_14"] }
 glib = "=0.22.10"
 gio = { version = "=0.22.10", features = ["v2_78"] }

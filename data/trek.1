@@ -1,0 +1,140 @@
+.TH TREK 1 "October 2026" "trek 0.1.0" "User Commands"
+.SH NAME
+trek \- a graphical file manager with the keys of Yazi
+.SH SYNOPSIS
+.B trek
+.RI [ OPTION ]...
+.RI [ FILE | URI ]...
+.SH DESCRIPTION
+.B trek
+is a graphical file manager driven from the keyboard with the key bindings
+of Yazi: the parent folder, the files and a preview side by side, a cursor
+moved with h, j, k and l, and a selection built with Space or visual mode.
+Press ~ or F1 in the window for the list of keys.
+It began as a port of PCManFM to Rust and GTK 4, and keeps PCManFM's menus,
+view modes, tabs, dual pane, side pane, trash can, volume handling and
+dialogs.
+.PP
+Folders named on the command line open as tabs in the window that was last
+used, or in a new window when there is none; files are opened with their
+applications.
+.B ~
+means the home folder, and a relative path is resolved against the
+directory the command was run from.
+With no arguments, that directory is opened in a new window.
+.PP
+One instance runs for each profile; a second invocation hands its arguments
+to the first and exits.
+.SH OPTIONS
+.TP
+.BR \-p ", " \-\-profile =\fIPROFILE\fR
+Use the settings of
+.I PROFILE
+(default:
+.BR default ).
+Each profile is its own instance.
+Only honoured by the first instance of a profile.
+.TP
+.BR \-d ", " \-\-daemon\-mode
+Start without a window and keep running after the last window is closed.
+Only honoured by the first instance.
+.TP
+.BR \-n ", " \-\-new\-win
+Open the folders in a new window instead of in tabs.
+.TP
+.BR \-\-show\-pref =\fIN\fR
+Open Preferences at page
+.IR N :
+1 General, 2 Display, 3 Layout, 4 Volume Management, 5 Advanced.
+.TP
+.B \-\-import\-pcmanfm
+Read the settings of PCManFM and libfm, take over those
+.B trek
+has, save them to the profile, print what was and was not imported, and
+exit.
+The files read are
+.I ~/.config/pcmanfm/PROFILE/pcmanfm.conf
+(or PCManFM's
+.B default
+profile when there is none of that name) and
+.IR ~/.config/libfm/libfm.conf ;
+they are not changed.
+This is never done automatically.
+.TP
+.BR \-\-no\-desktop ", " \-\-role =\fIROLE\fR
+Accepted for compatibility with PCManFM and Nautilus; they do nothing.
+.TP
+.B \-\-
+End of options; what follows is a file name even if it starts with a dash.
+.PP
+PCManFM's desktop and search options
+.RB ( \-\-desktop ,
+.BR \-\-desktop\-off ,
+.BR \-\-desktop\-pref ,
+.BR \-\-one\-screen ,
+.BR \-\-set\-wallpaper ,
+.BR \-\-wallpaper\-mode ,
+.BR \-\-find\-files )
+are recognised and refused with a message: this version has no desktop
+manager and no Find Files.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+.B \-\-import\-pcmanfm
+found nothing to import, or could not read it.
+.TP
+.B 2
+An option was not understood.
+.SH ENVIRONMENT
+.TP
+.B TERMINAL
+The terminal emulator to use when none is set in Preferences.
+.TP
+.B TREK_ALLOW_ROOTS
+While the build is locked (see
+.BR "SAFETY LOCK" ),
+a semicolon-separated list of extra folders, as paths or URIs, in which
+files may be changed.
+.TP
+.B TREK_GTK_THEME
+The name of the GTK theme to follow, for a session that cannot tell which
+one the desktop uses.
+.TP
+.B TREK_TRACE
+Set to
+.B 1
+to print start-up and folder-loading times on standard error.
+.SH FILES
+.TP
+.I ~/.config/trek/PROFILE/trek.conf
+Settings.
+.TP
+.I ~/.config/trek/PROFILE/dir\-settings.conf
+View settings of folders that have "Preserve This Folder's Settings" on.
+.TP
+.I ~/.config/gtk\-3.0/bookmarks
+Bookmarks, shared with GTK file choosers and other file managers.
+.TP
+.I ~/.cache/thumbnails
+Thumbnails, shared with other programs.
+.SH SAFETY LOCK
+This build is locked until its review is complete: copying, moving,
+deleting, renaming and creating files work only inside the test fixture
+.RI ( ~/.cache/trek\-fixture ),
+the temporary directory and the folders named in
+.BR TREK_ALLOW_ROOTS .
+Everywhere else
+.B trek
+browses and opens files but refuses to change them, and says so.
+.SH SEE ALSO
+.BR pcmanfm (1),
+.BR gio (1),
+.BR xdg\-mime (1)
+.SH AUTHORS
+Based on PCManFM by Hong Jen Yee (PCMan) and Andriy Grytsenko (LStranger).
+.SH COPYRIGHT
+GPL-2.0-or-later.
+There is NO WARRANTY, to the extent permitted by law.

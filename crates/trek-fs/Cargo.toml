@@ -1,0 +1,21 @@
+[package]
+name = "trek-fs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+trek-core.workspace = true
+gio.workspace = true
+gio-unix.workspace = true
+glib.workspace = true
+gdk-pixbuf.workspace = true
+async-channel.workspace = true
+nucleo.workspace = true
+ignore.workspace = true
+thiserror.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

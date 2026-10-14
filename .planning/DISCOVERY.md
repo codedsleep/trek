@@ -1,4 +1,4 @@
-# DISCOVERY.md — `tallboy`
+# DISCOVERY.md — `trek`
 
 Discovery run 2026-10-13 against `.planning/PROMPT.md`. Decisions here are the owner's answers plus facts measured on the target workstation.
 
@@ -35,7 +35,7 @@ Measured on 2026-10-13. Every decision below leans on at least one of these.
 
 ### Purpose and scope
 
-- **D1 — Daily driver.** `tallboy` replaces PCManFM on this workstation and will operate on the owner's real files. Data safety of the job engine outranks feature parity and speed.
+- **D1 — Daily driver.** `trek` replaces PCManFM on this workstation and will operate on the owner's real files. Data safety of the job engine outranks feature parity and speed.
 - **D2 — Staged delivery.** v1 is PROMPT slices 0–12, 15 and 18. v1.x is slices 13 (Find Files) and 14 (templates, archivers, custom actions, applications folder).
 - **D3 — Desktop manager deferred past v1.x.** Slices 16–17 are not built and nothing is scaffolded for them: no `desktop` cargo feature, no `gtk4-layer-shell`, no `core::desktop`, no `[desktop]` keys in `Config` (unknown keys are preserved on save anyway). `--desktop`, `--desktop-off`, `--desktop-pref`, `--one-screen`, `--set-wallpaper` and `--wallpaper-mode` are accepted, print `The desktop manager is not built in this version.` and exit non-zero for a first instance. The desktop is not a drag-and-drop target.
 - **D4 — Deferred features stay visible but inert.** The §8.2 menu tree is reproduced exactly. Actions whose slice is deferred are registered and permanently disabled: Tools ▸ Find Files…, Go ▸ Applications. Create New lists only Folder and Empty File. The Applications row in Places, the Compress/Extract items, custom actions, and the archiver and template controls in Preferences are omitted. `Location::parse` returns a typed "not supported in this version" error for `search://` and `menu://`.
@@ -45,7 +45,7 @@ Measured on 2026-10-13. Every decision below leans on at least one of these.
 
 - **D6 — Budgets are calibrated, not assumed.** Slice 0 measures process start → first frame for an empty GTK 4 window (release build, warm, median of 10). The §13 first-frame budget becomes that baseline + 100 ms and is written into `SCOPE.md`. The 50,000-entry budgets remain hard gates even though real folders are far smaller.
 - **D7 — The copy budget has two cases.** Cross-filesystem (tmpfs → btrfs, about 1 GiB of mixed files): within 10% of `cp -a`. Same-filesystem on btrfs: the copy should clone extents as `cp -a` does; verify in slice 6 and record the result. If GLib does not clone, log it as an open issue — do not hand-roll an ioctl.
-- **D8 — Fixture and test directories live on btrfs.** `scripts/mkfixture.sh` builds `~/.cache/tallboy-fixture`, not `/tmp/tallboy-fixture`. `tallboy-fs` integration tests create their temp dirs under `CARGO_TARGET_TMPDIR`. `/tmp` is then a real second filesystem for the move-fallback test.
+- **D8 — Fixture and test directories live on btrfs.** `scripts/mkfixture.sh` builds `~/.cache/trek-fixture`, not `/tmp/trek-fixture`. `trek-fs` integration tests create their temp dirs under `CARGO_TARGET_TMPDIR`. `/tmp` is then a real second filesystem for the move-fallback test.
 - **D9 — Hands-on QA matrix for volumes.** USB sticks and drives, the two internal disks (mount and unmount only — no write tests on them), SMB shares and an MTP phone. SFTP, FTP and WebDAV are built to spec but verified only by tests and review; `QA.md` marks them "not verified by hand".
 - **D10 — Folder handler plus `FileManager1`.** The default-profile primary instance owns `org.freedesktop.FileManager1` and implements `ShowFolders`, `ShowItems` (navigate and select) and `ShowItemProperties`, using GIO's D-Bus. It never replaces an existing owner. Deviation from upstream; built in Goal E.
 - **D11 — Reference is the installed 1.4.0.** The `pcmanfm` 1.4.0 / `libfm` 1.4.1 binaries on this machine settle any label, layout or edge case, side by side. Agents read upstream source at the matching versions. The importer targets the 1.4.1 config and prints, without importing, the keys §9 does not carry (`middle_click`, `force_startup_notify`, `date_iso_8601`, `smart_desktop_autodrop`).
@@ -53,8 +53,8 @@ Measured on 2026-10-13. Every decision below leans on at least one of these.
 
 ### Security
 
-- **D13 — Enforced job guard.** Every mutating entry point in `tallboy-fs` (all `JobKind`s, rename, create folder/file, bookmark writes excluded) calls one function, `fs::guard::check`, which rejects any source or destination outside the allowed roots unless `TALLBOY_UNLOCKED=1`. Allowed roots: the fixture directory, `CARGO_TARGET_TMPDIR`, and the system temp directory. Non-native URIs are rejected while locked. The guard has its own tests. Agents never set `TALLBOY_UNLOCKED`. The owner may set it after signing off Goal C. The guard is deleted in slice 18.
-- **D14 — Agent and test runs are isolated.** They set `XDG_CONFIG_HOME`, `XDG_CACHE_HOME` and `XDG_DATA_HOME` to directories under `~/.cache/tallboy-agent/`. That keeps the real bookmarks file, trash and thumbnail cache untouched, and keeps the agent's trash on the same filesystem as the fixture so trashing still works. Agents use `--profile agent`.
+- **D13 — Enforced job guard.** Every mutating entry point in `trek-fs` (all `JobKind`s, rename, create folder/file, bookmark writes excluded) calls one function, `fs::guard::check`, which rejects any source or destination outside the allowed roots unless `TREK_UNLOCKED=1`. Allowed roots: the fixture directory, `CARGO_TARGET_TMPDIR`, and the system temp directory. Non-native URIs are rejected while locked. The guard has its own tests. Agents never set `TREK_UNLOCKED`. The owner may set it after signing off Goal C. The guard is deleted in slice 18.
+- **D14 — Agent and test runs are isolated.** They set `XDG_CONFIG_HOME`, `XDG_CACHE_HOME` and `XDG_DATA_HOME` to directories under `~/.cache/trek-agent/`. That keeps the real bookmarks file, trash and thumbnail cache untouched, and keeps the agent's trash on the same filesystem as the fixture so trashing still works. Agents use `--profile agent`.
 - **D15 — Upstream launch prompts, plus a removable-media rule.** Prompts match PCManFM. Deviation: on filesystems whose execute bits are synthetic (vfat, exfat, ntfs, and any non-native location such as MTP or SMB) a `.desktop` launcher is never trusted, and an "executable" text file opens with its default application instead of offering Execute. The autorun dialog cannot remember a choice for `x-content/unix-software`.
 - **D16 — Image thumbnails only in v1.** The built-in gdk-pixbuf generator ships; `.thumbnailer` support moves to v1.x and must run under `bwrap` when it arrives. Cache layout, validity checks and fail markers are unchanged, so the cache is still shared with other applications.
 - **D17 — `admin://` is blocked.** `Location::parse` rejects the scheme with a clear message. Everything that produces a location — the location bar, command-line arguments, bookmarks, `FileManager1` — goes through `Location::parse`.
@@ -62,16 +62,16 @@ Measured on 2026-10-13. Every decision below leans on at least one of these.
 
 ### Stack
 
-- **D19 — Name stays `tallboy`**, app ID `io.github.codedsleep.Tallboy`.
-- **D20 — System GTK 4 theme.** `tallboy` ships no colours and follows the system's theme and light/dark preference. It will not match the owner's NordArc PCManFM until a GTK 4 Nord theme is installed; that is accepted.
+- **D19 — Name is `trek`**, app ID `io.github.codedsleep.Trek` (owner, 2026-10-14: renamed throughout — crates, binary, app ID, environment variables, config and cache folders).
+- **D20 — System GTK 4 theme.** `trek` ships no colours and follows the system's theme and light/dark preference. It will not match the owner's NordArc PCManFM until a GTK 4 Nord theme is installed; that is accepted.
 - **D21 — This workstation only.** `scripts/install.sh` builds release and installs to `~/.local`. No CI, no release pipeline, no portability testing. The `v4_14` feature floor stays as the PROMPT has it.
 - **D22 — v1 dependency list.** `gtk4` 0.11.5 (`v4_14`), `glib`/`gio` 0.22.10, `gdk-pixbuf` 0.22.0, `gio-unix` 0.22.8 if `DesktopAppInfo` lives there (confirm on docs.rs at scaffold), `async-channel` 2.5.0, `thiserror` 2.0.21, `log` 0.4.34, dev-only `tempfile` 3.27.0. `regex` and `gtk4-layer-shell` are not v1 dependencies; they arrive with the slices that need them.
-- **D23 — Crash log.** The release profile keeps `panic = "abort"`. A panic hook writes the message and location to `$XDG_STATE_HOME/tallboy/crash.log` first, because a keybind-launched process has no visible stderr.
+- **D23 — Crash log.** The release profile keeps `panic = "abort"`. A panic hook writes the message and location to `$XDG_STATE_HOME/trek/crash.log` first, because a keybind-launched process has no visible stderr.
 
 ### Development and operations
 
-- **D24 — Split by crate.** Within each goal Codex writes `tallboy-core` and `tallboy-fs` with their headless tests, then Claude writes the `tallboy` GTK crate, `data/` and `QA.md`. PROMPT §7 is the API contract between them. Codex leaves `.planning/HANDOFF-<goal>.md` describing the API as built. If Claude is blocked by a gap in `fs` or `core`, Claude may patch it and must list the patch in the hand-off for Codex's review.
-- **D25 — Agents check the UI headlessly.** `scripts/agent-run.sh` starts `tallboy` inside a headless `cage` session with the D14 environment and captures it with `grim`. Nothing appears on the owner's monitors. Because every command is a `gio` action (§7.7), agents drive the UI by activating actions over D-Bus rather than injecting input. Drag-and-drop, clipboard interop and volumes cannot be checked this way and belong to owner QA.
+- **D24 — Split by crate.** Within each goal Codex writes `trek-core` and `trek-fs` with their headless tests, then Claude writes the `trek` GTK crate, `data/` and `QA.md`. PROMPT §7 is the API contract between them. Codex leaves `.planning/HANDOFF-<goal>.md` describing the API as built. If Claude is blocked by a gap in `fs` or `core`, Claude may patch it and must list the patch in the hand-off for Codex's review.
+- **D25 — Agents check the UI headlessly.** `scripts/agent-run.sh` starts `trek` inside a headless `cage` session with the D14 environment and captures it with `grim`. Nothing appears on the owner's monitors. Because every command is a `gio` action (§7.7), agents drive the UI by activating actions over D-Bus rather than injecting input. Drag-and-drop, clipboard interop and volumes cannot be checked this way and belong to owner QA.
 - **D26 — Review per goal, twice for Goal C.** Codex reviews each goal before owner QA. Goal C's job engine gets a second review focused on data loss — symlink handling, partial files, cancel, cross-filesystem move, the guard — before the owner may unlock.
 - **D27 — Side-by-side cutover.** `install.sh` installs the binary, `.desktop` file and icon and changes no defaults. `install.sh --set-default` registers `inode/directory` and installs the `FileManager1` D-Bus service file. PCManFM stays installed as the reference.
 - **D28 — Repo conventions.** Private repo, `master`, commit prefix `slice N:`, push at the end of each slice. `scripts/check.sh` is the only gate.
@@ -105,7 +105,7 @@ flowchart TB
     LAUNCH["Launched applications, terminal"]
   end
 
-  subgraph BIN["tallboy — GTK 4 binary, main thread only"]
+  subgraph BIN["trek — GTK 4 binary, main thread only"]
     APP["app.rs · cli.rs<br/>GApplication, single instance, profiles"]
     DBUS["dbus.rs<br/>org.freedesktop.FileManager1"]
     ACT["actions.rs<br/>one table of gio actions"]
@@ -115,7 +115,7 @@ flowchart TB
     SET["settings.rs<br/>typed Settings + change signals"]
   end
 
-  subgraph FS["tallboy-fs — glib + gio, no GTK"]
+  subgraph FS["trek-fs — glib + gio, no GTK"]
     GUARD["guard.rs<br/>allowed-roots check (until slice 18)"]
     FOLDER["folder.rs<br/>async load + monitor"]
     JOBS["jobs/<br/>one thread per job"]
@@ -124,7 +124,7 @@ flowchart TB
     SYS["volumes.rs · trash.rs · apps.rs · terminal.rs"]
   end
 
-  subgraph CORE["tallboy-core — pure Rust, no glib"]
+  subgraph CORE["trek-core — pure Rust, no glib"]
     PURE["config · sort · naming · format<br/>glob · location · history"]
   end
 
@@ -163,17 +163,17 @@ pcmanfm-port-rust/
 │   ├── PROMPT.md  DISCOVERY.md  SCOPE.md  QA.md
 │   └── HANDOFF-<goal>.md         # + Codex → Claude, one per goal (D24)
 ├── crates/
-│   ├── tallboy-core/src/         # thiserror, log only
+│   ├── trek-core/src/            # thiserror, log only
 │   │   ├── lib.rs  config/  sort.rs  naming.rs  format.rs
 │   │   └── glob.rs  location.rs  history.rs
 │   │       (deferred: search.rs, actions.rs, exec.rs, desktop/)
-│   ├── tallboy-fs/src/
+│   ├── trek-fs/src/
 │   │   ├── lib.rs  meta.rs  folder.rs  jobs/  thumbs/
 │   │   ├── guard.rs              # + D13
 │   │   ├── settings_store.rs  bookmarks.rs  volumes.rs
 │   │   └── apps.rs  terminal.rs  trash.rs
 │   │       (deferred: archiver.rs, templates.rs, appmenu.rs, search.rs)
-│   └── tallboy/src/
+│   └── trek/src/
 │       ├── main.rs               # + panic hook (D23)
 │       ├── app.rs  cli.rs  settings.rs  actions.rs
 │       ├── dbus.rs               # + FileManager1 (D10)
@@ -181,10 +181,10 @@ pcmanfm-port-rust/
 │       └── clipboard.rs  volumes.rs
 │           (deferred: desktop/)
 ├── data/
-│   ├── io.github.codedsleep.Tallboy.desktop
+│   ├── io.github.codedsleep.Trek.desktop
 │   ├── org.freedesktop.FileManager1.service   # + installed by --set-default
-│   ├── tallboy.svg  style.css  terminals.list  tallboy.1
-│   └── (deferred: archivers.list, tallboy-desktop-pref.desktop)
+│   ├── trek.svg  style.css  terminals.list  trek.1
+│   └── (deferred: archivers.list, trek-desktop-pref.desktop)
 └── scripts/
     ├── check.sh  mkfixture.sh  install.sh
     └── agent-run.sh              # + headless cage wrapper (D25)
@@ -223,7 +223,7 @@ After the first install, slice 0 confirms `pkg-config --modversion gtk4 glib-2.0
 
 ## 7. Security checklist
 
-Audited 2026-10-13. Ticks mean evidence reviewed; remaining behavior findings and owner-only checks are stated explicitly. Crate references below are relative to `crates/tallboy-fs`, `crates/tallboy-core` or `crates/tallboy` as indicated; test paths without a crate prefix are in `crates/tallboy-fs/tests`.
+Audited 2026-10-13. Ticks mean evidence reviewed; remaining behavior findings and owner-only checks are stated explicitly. Crate references below are relative to `crates/trek-fs`, `crates/trek-core` or `crates/trek` as indicated; test paths without a crate prefix are in `crates/trek-fs/tests`.
 **Destructive operations**
 - [x] `fs::guard::check` is called by every mutating entry point; a test enumerates them and fails if one is missed (Goal C). **Evidence (Phase 10):** `fs/tests/guard.rs::every_mutating_entry_point_uses_guard`; job preflight and single-item APIs independently check the guard.
 - [x] Recursive delete, attribute change and count never follow symlinks; a symlink to a directory is removed as a link (Goal C, D). **Evidence (Phase 10):** `jobs.rs::links_and_recursive_delete_never_follow_symlinks`, `recursive_attrs_skip_symlink_targets_and_non_utf8_self_copy`, `setattrs_count_and_single_item_operations`; permission-repair limitation is HANDOFF-C decision 2.
@@ -231,15 +231,15 @@ Audited 2026-10-13. Ticks mean evidence reviewed; remaining behavior findings an
 - [x] A cancelled or failed copy leaves no partial destination file (Goal C). **Evidence (Phase 10):** `data_loss.rs::cancel_mid_file_preserves_existing_destination`, `destination_disappears_mid_job`; crash/kill staging residue is deviation 17, separate from handled cancellation.
 - [x] Copying or moving a directory into itself, or onto itself, is rejected before any write (Goal C). **Evidence (Phase 10):** `jobs.rs::copy_merge_self_copy_and_into_self_preflight`, `recursive_attrs_skip_symlink_targets_and_non_utf8_self_copy`; engine preflight runs before preparation/writes.
 - [x] Move falls back to copy-then-delete only after the copy of that item fully succeeded (Goal C). **Evidence (Phase 10):** `data_loss.rs::real_cross_filesystem_move_and_injected_copy_failure`; source retained after failure. Child error recovery is HANDOFF-C decision 1.
-- [x] Delete inside `trash://` and Shift+Delete always confirm when `confirm_del=1`; the dialog names the file or the count (Goal C). **Evidence (Phase 10):** `tallboy/src/window/fileops.rs::delete`, `scripts/agent/checks/fileops.sh`; selected URIs and names captured before confirmation.
+- [x] Delete inside `trash://` and Shift+Delete always confirm when `confirm_del=1`; the dialog names the file or the count (Goal C). **Evidence (Phase 10):** `trek/src/window/fileops.rs::delete`, `scripts/agent/checks/fileops.sh`; selected URIs and names captured before confirmation.
 - [x] *Proposed deviation:* a recursive delete that meets a mount point inside the tree stops and asks rather than descending (Goal C; see O-5). **Evidence (Phase 10):** `fs/src/jobs/operations.rs::recursive_delete_mount_boundary` tests policy and Question::MountBoundary dispatch; real mounted media remains owner QA.
 
 **Execution**
 - [x] No `sh -c` anywhere; `Exec` parsed to argv before substitution (D18). A fixture file named `; rm -rf ~` opens harmlessly (Goal B). **Evidence (Phase 10):** `fs/tests/apps.rs::terminal_argv_has_no_shell_interpolation`, `apps_fixture_subprocess`, `isolated_app_launches`; `checks/opening.sh`. Production launcher/terminal argv reviewed; test stand-in scripts use shells deliberately.
-- [x] Launcher trust requires an executable bit on a filesystem with real permissions, or a path under an XDG applications directory (D15) (Goal B). **Evidence (Phase 10):** `core/src/open.rs::decision_table`, `tallboy/src/open.rs::execution_trust_queries_the_target_filesystem_and_refuses_unknown_trust`; actual target filesystem queried at activation, including symlinks. Real synthetic mount remains owner QA.
+- [x] Launcher trust requires an executable bit on a filesystem with real permissions, or a path under an XDG applications directory (D15) (Goal B). **Evidence (Phase 10):** `core/src/open.rs::decision_table`, `trek/src/open.rs::execution_trust_queries_the_target_filesystem_and_refuses_unknown_trust`; actual target filesystem queried at activation, including symlinks. Real synthetic mount remains owner QA.
 - [x] Executable-text prompt suppressed on synthetic-permission filesystems (D15) (Goal B). **Evidence (Phase 10):** `core/src/open.rs::decision_table` and activation filesystem regression above.
 - [x] `quick_exec` defaults to 0 and is never set by the importer without printing it (Goal E). **Evidence (Phase 10):** `core/src/config` default and codec tests; `fs/tests/import.rs::owners_config_copies_and_explicit_quick_exec_advisory` verifies the printed advisory.
-- [x] Autorun never launches without a dialog on first sight of a content type; no remembered choice for `x-content/unix-software` (Goal D). **Evidence (Phase 10):** `fs/tests/volumes.rs::filters_automount_and_autorun`; `tallboy/src/volumes.rs` and `dialogs/autorun.rs` reviewed; first-time dialog always presented, remembered software execution prohibited. Real insertion remains owner QA.
+- [x] Autorun never launches without a dialog on first sight of a content type; no remembered choice for `x-content/unix-software` (Goal D). **Evidence (Phase 10):** `fs/tests/volumes.rs::filters_automount_and_autorun`; `trek/src/volumes.rs` and `dialogs/autorun.rs` reviewed; first-time dialog always presented, remembered software execution prohibited. Real insertion remains owner QA.
 
 **Locations and input**
 - [x] `admin://` rejected by `Location::parse` from every entry point (D17) (Goal A). **Evidence (Phase 10):** `core/src/location.rs` parser tests; CLI, tab navigation, bookmarks, Connect and FileManager1 enter through Location::parse; no alternate privileged backend.
@@ -253,14 +253,14 @@ Audited 2026-10-13. Ticks mean evidence reviewed; remaining behavior findings an
 - [x] `thumbnail_max` and `thumbnail_local` are honoured before any decode starts (Goal E). **Evidence (Phase 10):** `fs/src/thumbs/pool.rs::generate` calls skip before cache read/decode; `cache_vector_sizes_chunks_validity_fail_and_skip` covers limits/local policy.
 
 **Credentials and privilege**
-- [x] Passwords only ever pass through `gtk::MountOperation`; none are logged, including at trace level (Goal D). **Evidence (Phase 10):** `tallboy/src/dialogs/connect.rs` routes to `tallboy/src/volumes.rs::operation`, which uses gtk::MountOperation; no password entry/storage/logging in application. `core/src/location.rs::embedded_passwords_never_enter_stored_or_logged_locations` rejects credentials in URIs, including escaped userinfo. Live secret-service behavior remains owner QA.
+- [x] Passwords only ever pass through `gtk::MountOperation`; none are logged, including at trace level (Goal D). **Evidence (Phase 10):** `trek/src/dialogs/connect.rs` routes to `trek/src/volumes.rs::operation`, which uses gtk::MountOperation; no password entry/storage/logging in application. `core/src/location.rs::embedded_passwords_never_enter_stored_or_logged_locations` rejects credentials in URIs, including escaped userinfo. Live secret-service behavior remains owner QA.
 - [x] Unmount is never forced; a busy volume reports the error (Goal D). **Evidence (Phase 10):** `fs/src/volumes/operations.rs` passes MountUnmountFlags::NONE; `fs/tests/volumes.rs::mount_locations_and_busy_error` tests busy-error presentation mapping.
 - [x] `QA.md` records that "remember forever" is unavailable without a secret service (Goal D). **Evidence (Phase 10):** QA Phase 8 explicitly records absent secret service and unavailable remember-forever; owner checkpoint 4 tests real password prompt.
 
 **Process**
 - [x] `#![deny(unsafe_code)]` in `core` and `fs`; any `unsafe` in the binary is isolated and listed in `SCOPE.md`. **Evidence (Phase 10):** Both crate roots deny unsafe; production binary has no unsafe blocks. `scripts/agent/vinput.c` is separate test tooling, not application code.
-- [x] Agents and tests run with the D14 environment and `--profile agent`; `check.sh` asserts the XDG variables are set before the smoke run. **Evidence (Phase 10):** `scripts/agent-run.sh` isolates XDG config/cache/data/state, bus and displays, unsets unlock; `tallboy/src/cli.rs::check_smoke_isolation` checks XDG values/profile before smoke; test fixtures use private dirs/buses.
-- [x] `COPYING` (GPL-2.0) and upstream credit present before the first code commit. **Evidence (Phase 10):** `COPYING`, README and `tallboy/src/dialogs/help.rs` About credit inspected; licence was present at initial scaffold.
+- [x] Agents and tests run with the D14 environment and `--profile agent`; `check.sh` asserts the XDG variables are set before the smoke run. **Evidence (Phase 10):** `scripts/agent-run.sh` isolates XDG config/cache/data/state, bus and displays, unsets unlock; `trek/src/cli.rs::check_smoke_isolation` checks XDG values/profile before smoke; test fixtures use private dirs/buses.
+- [x] `COPYING` (GPL-2.0) and upstream credit present before the first code commit. **Evidence (Phase 10):** `COPYING`, README and `trek/src/dialogs/help.rs` About credit inspected; licence was present at initial scaffold.
 ---
 
 ## 8. Risks

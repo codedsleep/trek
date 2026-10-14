@@ -1,6 +1,6 @@
 # Dual-pane mode (SCOPE 9.2). Run with:
-#   scripts/agent-run.sh -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/dual-pane.sh
-P=$(mktemp -d "$HOME/.cache/tallboy-agent/dual-XXXXXX")
+#   scripts/agent-run.sh -- ~/.cache/trek-fixture/names < scripts/agent/checks/dual-pane.sh
+P=$(mktemp -d "$HOME/.cache/trek-agent/dual-XXXXXX")
 mkdir -p "$P/left" "$P/right"; printf 'one\n' >"$P/left/one.txt"; printf 'two\n' >"$P/left/two.txt"
 loc() { state | grep -o 'location=[^ ]*'; }
 act go-to "'$P/left'"; settle 0.8
@@ -48,5 +48,5 @@ check "closing the last tab of the second pane leaves dual-pane mode" has "$(sta
 vin key F3; settle 0.8
 vin move 500 500 click; settle 0.3; vin key ctrl+w; settle 0.6
 check "closing the last tab of the first pane keeps the other" has "$(state)" 'panes=1 active_pane=0 tabs=1 live_tabs=1'
-check "nothing was logged as a warning" test -z "$(grep -E 'WARNING|CRITICAL' "$OUT/tallboy.log")"
+check "nothing was logged as a warning" test -z "$(grep -E 'WARNING|CRITICAL' "$OUT/trek.log")"
 

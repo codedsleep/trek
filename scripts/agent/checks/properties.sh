@@ -1,6 +1,6 @@
 # Properties and Connect to Server (SCOPE 8.9–8.11). Run with:
-#   scripts/agent-run.sh -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/properties.sh
-P=$(mktemp -d "$HOME/.cache/tallboy-agent/props-XXXXXX")
+#   scripts/agent-run.sh -- ~/.cache/trek-fixture/names < scripts/agent/checks/properties.sh
+P=$(mktemp -d "$HOME/.cache/trek-agent/props-XXXXXX")
 mkdir -p "$P/folder/inner"; printf 'hello\n' >"$P/a.txt"; printf 'x\n' >"$P/b.txt"
 head -c 3000 /dev/zero >"$P/folder/inner/data"; printf 'y\n' >"$P/folder/top"
 chmod 644 "$P/a.txt"; chmod 600 "$P/b.txt"; chmod 755 "$P/folder" "$P/folder/inner"; chmod 644 "$P/folder/top"

@@ -1,6 +1,6 @@
 # Navigation chrome and shortcut safety (SCOPE 6.1–6.6). Run with:
-#   scripts/agent-run.sh -- ~/.cache/tallboy-fixture/deep < scripts/agent/checks/navigation.sh
-F=$HOME/.cache/tallboy-fixture
+#   scripts/agent-run.sh -- ~/.cache/trek-fixture/deep < scripts/agent/checks/navigation.sh
+F=$HOME/.cache/trek-fixture
 at() { has "$(state)" "location=file://$F$1 "; }
 settle 0.6
 echo "--- tabs"

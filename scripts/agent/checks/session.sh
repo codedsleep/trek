@@ -23,4 +23,4 @@ for dialog in about edit-bookmarks folder-properties connect-server run-command 
 done
 vin key ctrl+q; settle 1.2
 check 'closing the session releases every tab and folder' has \
-    "$(rg 'after a window closed' "$OUT/tallboy.log" | tail -1)" 'live_tabs=0 live_folders=0'
+    "$(rg 'after a window closed' "$OUT/trek.log" | tail -1)" 'live_tabs=0 live_folders=0'

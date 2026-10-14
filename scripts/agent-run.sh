@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Runs tallboy for an agent: headless cage compositor, private D-Bus session,
+# Runs trek for an agent: headless cage compositor, private D-Bus session,
 # isolated XDG directories, --profile agent. Nothing reaches the owner's
 # monitors, bus, config, trash or thumbnail cache (DISCOVERY D14, D25; SCOPE S5).
 #
-#   scripts/agent-run.sh [options] [-- tallboy arguments] < driver.sh
+#   scripts/agent-run.sh [options] [-- trek arguments] < driver.sh
 #
 # The driver is a bash script read from stdin. It runs inside the session once
 # the application has started, with these helpers:
@@ -15,7 +15,7 @@
 #   state                dump and print the active tab's state line
 #   wait_log REGEX [S]   wait until the log matches (default 10 s)
 #   settle [S]           sleep (default 0.4)
-#   tallboy ARGS...      a further invocation with the agent profile
+#   trek ARGS...         a further invocation with the agent profile
 #   check DESC CMD...    print PASS or FAIL for CMD; any FAIL fails the run
 #   has TEXT REGEX       true when TEXT matches (for use with check)
 # With no driver the application runs until --timeout.
@@ -24,15 +24,15 @@
 #   --size WxH     output size in pixels (default 1280x720)
 #   --scale N      output scale (default 1)
 #   --release      use the release build
-#   --app CMD      run CMD instead of tallboy (reference shots of pcmanfm)
+#   --app CMD      run CMD instead of trek (reference shots of pcmanfm)
 #   --env K=V      set a variable for the application only (repeatable)
-#   --smoke        shorthand for --env TALLBOY_SMOKE=1 --env G_DEBUG=fatal-criticals
+#   --smoke        shorthand for --env TREK_SMOKE=1 --env G_DEBUG=fatal-criticals
 #   --keep         keep the agent profile's config from the previous run
 #   --out DIR      artefact directory (default target/agent/out)
 #   --timeout S    hard limit for the whole session (default 90)
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
-agent_home="$HOME/.cache/tallboy-agent"
+agent_home="$HOME/.cache/trek-agent"
 
 if [[ ${1:-} != --inside ]]; then
     size=1280x720 scale=1 build=debug app="" keep=0 out="$root/target/agent/out" limit=90
@@ -44,7 +44,7 @@ if [[ ${1:-} != --inside ]]; then
             --release) build=release; shift ;;
             --app) app=$2; shift 2 ;;
             --env) app_env+=("$2"); shift 2 ;;
-            --smoke) app_env+=(TALLBOY_SMOKE=1 G_DEBUG=fatal-criticals); shift ;;
+            --smoke) app_env+=(TREK_SMOKE=1 G_DEBUG=fatal-criticals); shift ;;
             --keep) keep=1; shift ;;
             --out) out=$2; shift 2 ;;
             --timeout) limit=$2; shift 2 ;;
@@ -57,16 +57,16 @@ if [[ ${1:-} != --inside ]]; then
     done
     "$root/scripts/agent/build-vinput.sh"
     if [[ -z $app ]]; then
-        if [[ $build == release ]]; then cargo build --release -q -p tallboy; else cargo build -q -p tallboy; fi
+        if [[ $build == release ]]; then cargo build --release -q -p trek; else cargo build -q -p trek; fi
     fi
     mkdir -p "$out" "$agent_home"/{config,cache,data,state}
-    [[ $keep == 1 ]] || rm -rf "$agent_home/config/tallboy/agent"
+    [[ $keep == 1 ]] || rm -rf "$agent_home/config/trek/agent"
     driver="$out/driver.sh"
     if [[ -t 0 ]]; then : >"$driver"; else cat >"$driver"; fi
-    unset WAYLAND_DISPLAY DISPLAY HYPRLAND_INSTANCE_SIGNATURE TALLBOY_UNLOCKED
+    unset WAYLAND_DISPLAY DISPLAY HYPRLAND_INSTANCE_SIGNATURE TREK_UNLOCKED
     export XDG_CONFIG_HOME="$agent_home/config" XDG_CACHE_HOME="$agent_home/cache"
     export XDG_DATA_HOME="$agent_home/data" XDG_STATE_HOME="$agent_home/state"
-    export TALLBOY_ALLOW_ROOTS="$HOME/.cache/tallboy-fixture;$agent_home${TALLBOY_ALLOW_ROOTS:+;$TALLBOY_ALLOW_ROOTS}"
+    export TREK_ALLOW_ROOTS="$HOME/.cache/trek-fixture;$agent_home${TREK_ALLOW_ROOTS:+;$TREK_ALLOW_ROOTS}"
     export WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 GTK_A11Y=none NO_AT_BRIDGE=1
     export AGENT_SIZE=$size AGENT_SCALE=$scale AGENT_BUILD=$build AGENT_APP=$app OUT=$out
     export AGENT_DRIVER=$driver AGENT_APP_ENV="${app_env[*]}"
@@ -79,9 +79,9 @@ shift
 wlr-randr --output HEADLESS-1 --custom-mode "$AGENT_SIZE" --scale "$AGENT_SCALE" >/dev/null
 width=${AGENT_SIZE%x*} height=${AGENT_SIZE#*x}
 export VINPUT_EXTENT="$(awk -v w="$width" -v h="$height" -v s="$AGENT_SCALE" 'BEGIN{printf "%dx%d", w/s, h/s}')"
-app_id=io.github.codedsleep.Tallboy.p_agent
-app_path=/io/github/codedsleep/Tallboy/p_agent
-log="$OUT/tallboy.log"
+app_id=io.github.codedsleep.Trek.p_agent
+app_path=/io/github/codedsleep/Trek/p_agent
+log="$OUT/trek.log"
 WIN=1
 
 shot() { grim "$OUT/$1.png"; }
@@ -102,7 +102,7 @@ describe() {
         --method org.gtk.Actions.Describe "$1"
 }
 vin() { "$root/target/agent/vinput" "$@"; }
-tallboy() { "$root/target/$AGENT_BUILD/tallboy" --profile agent "$@"; }
+trek() { "$root/target/$AGENT_BUILD/trek" --profile agent "$@"; }
 FAILED=0
 check() {
     local description=$1
@@ -120,30 +120,30 @@ wait_log() {
 }
 state() {
     local before
-    before=$(grep -c '^tallboy state:' "$log" 2>/dev/null || true)
+    before=$(grep -c '^trek state:' "$log" 2>/dev/null || true)
     act debug-dump
     for _ in $(seq 100); do
-        [[ $(grep -c '^tallboy state:' "$log" 2>/dev/null || true) -gt ${before:-0} ]] && break
+        [[ $(grep -c '^trek state:' "$log" 2>/dev/null || true) -gt ${before:-0} ]] && break
         sleep 0.02
     done
-    grep '^tallboy state:' "$log" | tail -1
+    grep '^trek state:' "$log" | tail -1
 }
 
 # Emptied here, not by the background job's redirection: otherwise wait_log
-# can match "tallboy ready" left in the log by the previous run.
+# can match "trek ready" left in the log by the previous run.
 : >"$log"
 if [[ -n $AGENT_APP ]]; then
     # shellcheck disable=SC2086
     env $AGENT_APP_ENV $AGENT_APP "$@" >>"$log" 2>&1 &
 else
     # shellcheck disable=SC2086
-    env $AGENT_APP_ENV TALLBOY_T0="$(date +%s%N)" \
-        "$root/target/$AGENT_BUILD/tallboy" --profile agent "$@" >>"$log" 2>&1 &
+    env $AGENT_APP_ENV TREK_T0="$(date +%s%N)" \
+        "$root/target/$AGENT_BUILD/trek" --profile agent "$@" >>"$log" 2>&1 &
 fi
 app_pid=$!
 status=0
 if [[ -s $AGENT_DRIVER ]]; then
-    [[ -n $AGENT_APP ]] && sleep 1.5 || wait_log '^tallboy ready' 15 || true
+    [[ -n $AGENT_APP ]] && sleep 1.5 || wait_log '^trek ready' 15 || true
     set +e
     # shellcheck disable=SC1090
     (set -e; source "$AGENT_DRIVER"; exit "$FAILED")

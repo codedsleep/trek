@@ -1,7 +1,7 @@
 # The fuzzy finder (`z`), through real key presses. Run with:
-#   scripts/agent-run.sh -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/finder.sh
+#   scripts/agent-run.sh -- ~/.cache/trek-fixture/names < scripts/agent/checks/finder.sh
 # It only reads; the tree it searches is made here, inside the allowed roots.
-F=$(mktemp -d "$HOME/.cache/tallboy-agent/finder-XXXXXX")
+F=$(mktemp -d "$HOME/.cache/trek-agent/finder-XXXXXX")
 mkdir -p "$F/src/window" "$F/src/view" "$F/docs" "$F/.cache" "$F/build/out" "$F/many"
 for f in src/main.rs src/window/mod.rs src/window/vim.rs src/view/list.rs docs/guide.md \
     README.md Makefile .cache/secret.txt build/out/app.bin; do printf 'x\n' >"$F/$f"; done

@@ -1,9 +1,9 @@
 # File operations through the UI (SCOPE 7.2–7.9, 7.12). Run with:
-#   scripts/agent-run.sh -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/fileops.sh
-# Everything happens in ~/.cache/tallboy-agent/work, inside the allowed roots,
+#   scripts/agent-run.sh -- ~/.cache/trek-fixture/names < scripts/agent/checks/fileops.sh
+# Everything happens in ~/.cache/trek-agent/work, inside the allowed roots,
 # except the locked-build check, which must change nothing outside them.
-W=$HOME/.cache/tallboy-agent/work
-outside=$HOME/.cache/tallboy-outside-test
+W=$HOME/.cache/trek-agent/work
+outside=$HOME/.cache/trek-outside-test
 rm -rf "$W" "$outside"; mkdir -p "$W/sub" "$outside"
 printf 'one\n' >"$W/alpha.txt"; printf 'two\n' >"$W/beta.txt"; printf 'three\n' >"$W/gamma.tar.gz"
 enabled() { has "$(describe "$1")" '^\(\(true'; }

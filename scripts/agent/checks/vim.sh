@@ -1,8 +1,8 @@
 # The Yazi key bindings of the file view, through real key presses. Run with:
-#   scripts/agent-run.sh -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/vim.sh
+#   scripts/agent-run.sh -- ~/.cache/trek-fixture/names < scripts/agent/checks/vim.sh
 # Everything that changes files happens in a folder made here, inside the
 # allowed roots.
-V=$(mktemp -d "$HOME/.cache/tallboy-agent/vim-XXXXXX")
+V=$(mktemp -d "$HOME/.cache/trek-agent/vim-XXXXXX")
 mkdir -p "$V/sub/inner" "$V/zeta"
 for n in alpha beta gamma delta; do printf '%s\n' "$n" >"$V/$n.txt"; done
 printf 'x\n' >"$V/Archive.tar.gz"; printf 'h\n' >"$V/.hidden"

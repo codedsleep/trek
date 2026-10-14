@@ -1,7 +1,7 @@
-# PROMPT.md — `tallboy`: PCManFM, rebuilt in Rust
+# PROMPT.md — `trek`: PCManFM, rebuilt in Rust
 
-> Working name `tallboy` (a tall chest of drawers). Binary `tallboy`, app ID `io.github.codedsleep.Tallboy`.
-> The name appears only in `Cargo.toml`, the app ID, config paths and `data/` — rename before the first commit if wanted.
+> Name `trek`. Binary `trek`, app ID `io.github.codedsleep.Trek`.
+> The name appears in `Cargo.toml`, the crate folders, the app ID, the `TREK_*` environment variables, config paths, `data/` and `scripts/`.
 
 You are building a complete desktop file manager. Read this whole file before writing code. It is the single source of truth for scope, architecture, conventions and build order.
 
@@ -9,11 +9,11 @@ You are building a complete desktop file manager. Read this whole file before wr
 
 ## 1. Mission
 
-Recreate [PCManFM](https://github.com/lxde/pcmanfm) 1.3 (the GTK file manager from LXDE) in Rust, so that a PCManFM user can sit down at `tallboy` and not relearn anything: the same menus and shortcuts, four view modes, tabs, dual pane, Places / Directory Tree side pane, trash, volume management, remote locations, Find Files, Properties, Preferences, and the `--desktop` wallpaper-and-icons manager.
+Recreate [PCManFM](https://github.com/lxde/pcmanfm) 1.3 (the GTK file manager from LXDE) in Rust, so that a PCManFM user can sit down at `trek` and not relearn anything: the same menus and shortcuts, four view modes, tabs, dual pane, Places / Directory Tree side pane, trash, volume management, remote locations, Find Files, Properties, Preferences, and the `--desktop` wallpaper-and-icons manager.
 
 The upstream tagline is "extremely fast and lightweight file manager". That is a requirement, not decoration: see the budgets in §13.
 
-This is a **behavioural port**, not a line-by-line translation. Upstream is C on GTK 2/3 with X11 assumptions; `tallboy` is idiomatic Rust on GTK 4, Wayland-first.
+This is a **behavioural port**, not a line-by-line translation. Upstream is C on GTK 2/3 with X11 assumptions; `trek` is idiomatic Rust on GTK 4, Wayland-first.
 
 ### Source-of-truth order
 
@@ -29,22 +29,22 @@ PCManFM itself is a thin shell. Almost everything a user thinks of as "PCManFM" 
 
 So the port has three layers, and the bulk of the work is re-creating libfm in Rust on top of GIO:
 
-| Upstream | Role | `tallboy` home |
+| Upstream | Role | `trek` home |
 |---|---|---|
-| `pcmanfm.c`, `single-inst.c` | entry point, CLI options, single instance, profiles, daemon mode | `tallboy/src/main.rs`, `app.rs`, `cli.rs` |
-| `app-config.c` + libfm `fm-config.c` | settings, per-folder settings | `core/config`, `fs/settings_store.rs`, `tallboy/src/settings.rs` |
-| `main-win.c`, `main-win-ui.c` | window, menus, toolbar, tabs, dual pane | `tallboy/src/window/` |
-| `tab-page.c` | one tab: side pane + folder view + status bar, history | `tallboy/src/tab/` |
-| `pref.c` | Preferences dialog | `tallboy/src/dialogs/prefs/` |
-| `volume-manager.c` | automount, autorun | `fs/volumes.rs`, `tallboy/src/volumes.rs` |
-| `connect-server.c` | Connect to Server dialog | `tallboy/src/dialogs/connect.rs` |
-| `desktop.c`, `desktop-ui.c` | wallpaper + desktop icons | `tallboy/src/desktop/` |
+| `pcmanfm.c`, `single-inst.c` | entry point, CLI options, single instance, profiles, daemon mode | `trek/src/main.rs`, `app.rs`, `cli.rs` |
+| `app-config.c` + libfm `fm-config.c` | settings, per-folder settings | `core/config`, `fs/settings_store.rs`, `trek/src/settings.rs` |
+| `main-win.c`, `main-win-ui.c` | window, menus, toolbar, tabs, dual pane | `trek/src/window/` |
+| `tab-page.c` | one tab: side pane + folder view + status bar, history | `trek/src/tab/` |
+| `pref.c` | Preferences dialog | `trek/src/dialogs/prefs/` |
+| `volume-manager.c` | automount, autorun | `fs/volumes.rs`, `trek/src/volumes.rs` |
+| `connect-server.c` | Connect to Server dialog | `trek/src/dialogs/connect.rs` |
+| `desktop.c`, `desktop-ui.c` | wallpaper + desktop icons | `trek/src/desktop/` |
 | libfm `fm-folder`, `fm-file-info`, `fm-dir-list-job` | directory loading + monitoring | `fs/folder.rs`, `fs/meta.rs` |
-| libfm `fm-folder-model`, `fm-standard-view` | sort/filter model, the four views | `core/sort.rs`, `tallboy/src/view/` |
-| libfm `fm-file-ops-job*`, `fm-progress-dlg`, `fm-file-ops` | copy/move/delete/trash/link jobs and dialogs | `fs/jobs/`, `tallboy/src/dialogs/progress.rs` |
+| libfm `fm-folder-model`, `fm-standard-view` | sort/filter model, the four views | `core/sort.rs`, `trek/src/view/` |
+| libfm `fm-file-ops-job*`, `fm-progress-dlg`, `fm-file-ops` | copy/move/delete/trash/link jobs and dialogs | `fs/jobs/`, `trek/src/dialogs/progress.rs` |
 | libfm `fm-thumbnail*` | thumbnail cache + generation | `fs/thumbs/` |
-| libfm `fm-places-*`, `fm-dir-tree-*`, `fm-bookmarks` | side pane | `fs/bookmarks.rs`, `tallboy/src/sidepane/` |
-| libfm `fm-file-properties`, `fm-app-chooser-dlg` | Properties, Open With | `tallboy/src/dialogs/` |
+| libfm `fm-places-*`, `fm-dir-tree-*`, `fm-bookmarks` | side pane | `fs/bookmarks.rs`, `trek/src/sidepane/` |
+| libfm `fm-file-properties`, `fm-app-chooser-dlg` | Properties, Open With | `trek/src/dialogs/` |
 | libfm `vfs-search`, `fm-file-search-ui` | Find Files | `core/search.rs`, `fs/search.rs` |
 | libfm `fm-templates`, `fm-archiver`, `fm-actions`, `vfs-menu` | templates, archivers, custom actions, applications folder | `core/actions.rs`, `fs/{templates,archiver,appmenu}.rs` |
 
@@ -128,7 +128,7 @@ panic = "abort"
 ## 6. Repository layout
 
 ```
-tallboy/
+trek/
 ├── Cargo.toml                  # workspace
 ├── PROMPT.md
 ├── README.md
@@ -137,7 +137,7 @@ tallboy/
 │   ├── SCOPE.md                # scope, deviations, slice checklist (you maintain this)
 │   └── QA.md                   # manual QA checklist, grown per slice
 ├── crates/
-│   ├── tallboy-core/           # pure Rust. NO glib, NO gio, NO gtk.
+│   ├── trek-core/              # pure Rust. NO glib, NO gio, NO gtk.
 │   │   └── src/
 │   │       ├── lib.rs
 │   │       ├── config/         # Config struct, defaults, enum<->string codecs
@@ -151,7 +151,7 @@ tallboy/
 │   │       ├── actions.rs      # custom action file model + condition matching
 │   │       ├── exec.rs         # %f %F %u %U %d … field-code expansion
 │   │       └── desktop/        # wallpaper geometry, icon grid layout
-│   ├── tallboy-fs/             # glib + gio + gdk-pixbuf. NO gtk, NO gdk.
+│   ├── trek-fs/                # glib + gio + gdk-pixbuf. NO gtk, NO gdk.
 │   │   └── src/
 │   │       ├── lib.rs
 │   │       ├── meta.rs         # FileMeta (plain Send struct) from gio::FileInfo
@@ -168,7 +168,7 @@ tallboy/
 │   │       ├── appmenu.rs      # menu://applications
 │   │       ├── search.rs       # walker thread
 │   │       └── trash.rs
-│   └── tallboy/                # the binary. gtk4 (+ gtk4-layer-shell).
+│   └── trek/                   # the binary. gtk4 (+ gtk4-layer-shell).
 │       └── src/
 │           ├── main.rs  app.rs  cli.rs  settings.rs  actions.rs
 │           ├── window/         # main window, menubar, toolbar, pathbar, tabs, dual pane
@@ -180,24 +180,24 @@ tallboy/
 │           ├── volumes.rs      # mount-operation UI, autorun dialog
 │           └── desktop/        # layer-shell windows, canvas, desktop prefs   [feature = "desktop"]
 ├── data/
-│   ├── io.github.codedsleep.Tallboy.desktop
-│   ├── tallboy-desktop-pref.desktop
-│   ├── tallboy.svg
+│   ├── io.github.codedsleep.Trek.desktop
+│   ├── trek-desktop-pref.desktop
+│   ├── trek.svg
 │   ├── style.css
 │   ├── archivers.list
 │   ├── terminals.list
-│   └── tallboy.1
+│   └── trek.1
 └── scripts/
     ├── check.sh                # fmt + clippy + test + smoke
-    ├── mkfixture.sh            # builds /tmp/tallboy-fixture (see §11)
+    ├── mkfixture.sh            # builds /tmp/trek-fixture (see §11)
     └── install.sh              # cargo build --release + install binary/desktop file/icon to ~/.local
 ```
 
 ### Layering rules (enforced by `Cargo.toml`, not by good intentions)
 
-- `tallboy-core` depends on `regex`, `thiserror`, `log` only. Everything in it is deterministic and unit-tested.
-- `tallboy-fs` depends on `tallboy-core`, `glib`, `gio`, `gdk-pixbuf`, `async-channel`. It never touches a widget and never needs a display, so its tests run headless against temp directories.
-- `tallboy` depends on both. It contains **no file-operation logic** — it sends requests to `fs`, renders events, and answers questions.
+- `trek-core` depends on `regex`, `thiserror`, `log` only. Everything in it is deterministic and unit-tested.
+- `trek-fs` depends on `trek-core`, `glib`, `gio`, `gdk-pixbuf`, `async-channel`. It never touches a widget and never needs a display, so its tests run headless against temp directories.
+- `trek` depends on both. It contains **no file-operation logic** — it sends requests to `fs`, renders events, and answers questions.
 - Dependencies never point upward.
 
 ---
@@ -207,7 +207,7 @@ tallboy/
 ### 7.1 Locations
 
 ```rust
-// tallboy-core
+// trek-core
 pub enum Location {
     /// Anything GIO can enumerate: file://, trash://, sftp://, smb://, computer://, network://, recent:// …
     Uri(String),
@@ -252,7 +252,7 @@ fs::Folder (per Location, loads + monitors)
 All mutating operations are **jobs**. Each job runs on its own `std::thread`, uses synchronous GIO calls with a shared `gio::Cancellable`, and talks to the main thread only through channels.
 
 ```rust
-// tallboy-fs
+// trek-fs
 pub enum JobKind {
     Copy   { sources: Vec<String>, dest_dir: String },
     Move   { sources: Vec<String>, dest_dir: String },
@@ -314,7 +314,7 @@ Rules:
 
 - `core::config::Config` is a plain struct mirroring §9, with `Default`.
 - `fs::settings_store` loads it from GKeyFile files (`glib::KeyFile`) and saves atomically (write temp, rename).
-- `tallboy::settings::Settings` is the one handle the UI uses: typed getters, typed setters, and `connect_changed(Key, callback)`. Every setter marks dirty and schedules a debounced save (~1 s); also save on shutdown. **No widget reads a key file or caches a setting it should observe.** Preferences apply live.
+- `trek::settings::Settings` is the one handle the UI uses: typed getters, typed setters, and `connect_changed(Key, callback)`. Every setter marks dirty and schedules a debounced save (~1 s); also save on shutdown. **No widget reads a key file or caches a setting it should observe.** Preferences apply live.
 
 ### 7.7 Actions
 
@@ -574,7 +574,7 @@ Implement the freedesktop **Thumbnail Managing Standard**, sharing the cache wit
 - Cache path: `$XDG_CACHE_HOME/thumbnails/<dir>/<md5(uri)>.png`, where `<dir>` is `normal` (128), `large` (256), `x-large` (512) or `xx-large` (1024) — choose the smallest ≥ requested pixel size × scale factor.
 - Test vector: the MD5 of `file:///home/jens/photos/me.png` is `c6ee772d9e49320e97ec29a7eb5b1697`.
 - A cached thumbnail is valid when its `Thumb::URI` tEXt chunk equals the URI and `Thumb::MTime` equals the file's mtime (seconds).
-- Failures are recorded as an empty-image PNG with the same chunks in `thumbnails/fail/tallboy-<version>/` and not retried until mtime changes.
+- Failures are recorded as an empty-image PNG with the same chunks in `thumbnails/fail/trek-<version>/` and not retried until mtime changes.
 - Generators: (1) built-in for `image/*` via gdk-pixbuf — load at scale, apply embedded orientation; (2) external thumbnailers from `<XDG data dirs>/thumbnailers/*.thumbnailer` (`[Thumbnailer Entry]`, `Exec` with `%i %u %o %s`, `MimeType`), each run with a 10 s timeout and killed on overrun.
 - Write to a temp file in the same directory, mode 0600, then rename. Store `Thumb::URI`, `Thumb::MTime`, `Thumb::Size`, `Thumb::Mimetype`.
 - Skip files larger than `thumbnail_max` KiB (0 = no limit), files inside the thumbnail cache itself, and non-native files when `thumbnail_local`.
@@ -583,7 +583,7 @@ Implement the freedesktop **Thumbnail Managing Standard**, sharing the cache wit
 
 ### 8.20 Find Files
 
-`Ctrl+Shift+F` or `tallboy --find-files` opens the dialog, four tabs:
+`Ctrl+Shift+F` or `trek --find-files` opens the dialog, four tabs:
 
 - **Name/Location**: file name patterns (comma-separated globs), case insensitive ☑, use regular expression ☐; "Places to search" list with Add/Remove (pre-filled with the current folder); search in sub directories ☑; search for hidden files ☐.
 - **File Type**: only search for files of these types — Text files, Image files, Audio files, Video files, Documents, Folders, Other (free-form MIME list).
@@ -621,11 +621,11 @@ An action shows when its first matching profile matches the whole selection (con
 
 - **`menu://applications/`**: root lists the standard main categories that have at least one visible application (AudioVideo, Development, Education, Game, Graphics, Network, Office, Science, Settings, System, Utility, plus Other); a category lists its applications. Activating launches. Items are read-only: only Open and Properties (read-only) apply; dragging one out copies its `.desktop` file.
 - **About**: `gtk::AboutDialog` — name, version, GPL-2.0-or-later, and a credit line: "Based on PCManFM by Hong Jen Yee (PCMan) and Andriy Grytsenko (LStranger)".
-- **`tallboy --import-pcmanfm`**: one-shot. Reads `~/.config/pcmanfm/<profile>/pcmanfm.conf` and `~/.config/libfm/libfm.conf`, maps same-named keys into our config (§9 deliberately keeps upstream key names), writes it, prints what was imported, exits. Never runs automatically.
+- **`trek --import-pcmanfm`**: one-shot. Reads `~/.config/pcmanfm/<profile>/pcmanfm.conf` and `~/.config/libfm/libfm.conf`, maps same-named keys into our config (§9 deliberately keeps upstream key names), writes it, prints what was imported, exits. Never runs automatically.
 
 ### 8.25 Preferences dialog
 
-`Edit ▸ Preferences`, or `tallboy --show-pref=N` (1-based page). Every control is bound to `Settings` and applies immediately.
+`Edit ▸ Preferences`, or `trek --show-pref=N` (1-based page). Every control is bound to `Settings` and applies immediately.
 
 1. **General** — Behavior: open files with single click; delay of automatic selection in single click mode; move deleted files to "trash can" instead of erasing; erase files on removable media instead of "trash can" creation; confirm before moving files into "trash can"; confirm before deleting files; don't ask options on launch executable file; default drag and drop action; use SI decimal prefixes instead of IEC binary prefixes; treat backup files as hidden; always show full file names; default view mode; bookmarks open in (current tab / new tab / new window).
 2. **Display** — size of big icons, small icons, thumbnails, side pane icons; show thumbnails of files; only show thumbnails for local files; do not generate thumbnails for image files exceeding this size (KB); display hidden files' icons shadowed; hide 'Close tab' buttons; maximum tab label width.
@@ -660,16 +660,16 @@ Options (names and letters as upstream):
 | `[FILE…]` | paths or URIs to open. `~` means Home. Relative paths resolve against the **caller's** cwd. |
 
 - `gtk::Application` with `HANDLES_COMMAND_LINE`. GApplication provides single-instance and forwards later invocations (arguments + cwd) to the primary instance, which runs the same `run(args, cwd)` function.
-- The profile is part of the application ID, so each profile is its own instance: `io.github.codedsleep.Tallboy` for `default`, `io.github.codedsleep.Tallboy.p_<sanitised>` otherwise. Pre-scan `argv` for the profile before constructing the application.
+- The profile is part of the application ID, so each profile is its own instance: `io.github.codedsleep.Trek` for `default`, `io.github.codedsleep.Trek.p_<sanitised>` otherwise. Pre-scan `argv` for the profile before constructing the application.
 - With no files: open the caller's cwd in a new window — unless this is the first run in daemon mode. Folders given on the command line open as tabs in the last active window (or a new window with `-n`); files are opened with their applications.
 - The process stays alive while any window, the desktop manager, a running job, or daemon mode holds it.
 - `SIGTERM`/`SIGINT`/`SIGHUP`: save settings and quit cleanly.
 
 ### 8.28 Desktop manager  *(cargo feature `desktop`)*
 
-`tallboy --desktop` draws wallpaper and desktop icons. Wayland only, via `gtk4-layer-shell`. If layer shell is unsupported (X11, GNOME), print `Desktop manager requires a Wayland compositor with wlr-layer-shell.` and exit non-zero for a first instance (or show the error and carry on for a running one). Nothing else in the application depends on this feature.
+`trek --desktop` draws wallpaper and desktop icons. Wayland only, via `gtk4-layer-shell`. If layer shell is unsupported (X11, GNOME), print `Desktop manager requires a Wayland compositor with wlr-layer-shell.` and exit non-zero for a first instance (or show the error and carry on for a running one). Nothing else in the application depends on this feature.
 
-**Surfaces.** One layer-shell window per monitor (only one with `--one-screen`): layer `Background`, anchored to all four edges, exclusive zone `-1`, namespace `tallboy-desktop`, keyboard mode `OnDemand`. Follow monitor hot-plug. Icons are laid out inside the monitor area minus `[desktop] margins` (default `0;0;0;0`, order top;right;bottom;left) so they can clear panels. Read the gtk4-layer-shell README about link order before debugging a surface that will not anchor.
+**Surfaces.** One layer-shell window per monitor (only one with `--one-screen`): layer `Background`, anchored to all four edges, exclusive zone `-1`, namespace `trek-desktop`, keyboard mode `OnDemand`. Follow monitor hot-plug. Icons are laid out inside the monitor area minus `[desktop] margins` (default `0;0;0;0`, order top;right;bottom;left) so they can clear panels. Read the gtk4-layer-shell README about link order before debugging a surface that will not anchor.
 
 **Canvas.** One custom widget (`DesktopCanvas`, the app's only non-`FileItem` GObject subclass besides trivially small row objects) that draws everything itself in `snapshot`: wallpaper, icons, labels, selection, rubber band. No child widgets per icon; hit-testing is against the layout rectangles.
 
@@ -683,7 +683,7 @@ Options (names and letters as upstream):
 
 **Desktop Preferences** (`--desktop-pref`): *Appearance* — wallpaper mode, wallpaper file (`gtk::FileDialog`), use the same wallpaper on all monitors, background colour, label text colour, label shadow colour, label font; *Desktop Icons* — show Documents / Trash Can / connected volumes; *Advanced* — desktop folder, margins. Live-applied.
 
-Ship `data/tallboy-desktop-pref.desktop` and document a Hyprland `exec-once = tallboy --desktop` line in the README.
+Ship `data/trek-desktop-pref.desktop` and document a Hyprland `exec-once = trek --desktop` line in the README.
 
 ---
 
@@ -691,10 +691,10 @@ Ship `data/tallboy-desktop-pref.desktop` and document a Hyprland `exec-once = ta
 
 Files, per profile `<p>` (default `default`):
 
-- `$XDG_CONFIG_DIRS/tallboy/<p>/tallboy.conf` — system defaults, loaded first (each dir, lowest priority first)
-- `$XDG_CONFIG_HOME/tallboy/<p>/tallboy.conf` — user
-- `$XDG_CONFIG_HOME/tallboy/<p>/dir-settings.conf` — per-folder settings
-- `$XDG_CONFIG_HOME/tallboy/<p>/desktop-items-<connector>.conf` — pinned desktop icon positions
+- `$XDG_CONFIG_DIRS/trek/<p>/trek.conf` — system defaults, loaded first (each dir, lowest priority first)
+- `$XDG_CONFIG_HOME/trek/<p>/trek.conf` — user
+- `$XDG_CONFIG_HOME/trek/<p>/dir-settings.conf` — per-folder settings
+- `$XDG_CONFIG_HOME/trek/<p>/desktop-items-<connector>.conf` — pinned desktop icon positions
 
 GKeyFile format. Booleans are `0`/`1`. Unknown keys are preserved on save. Key names match PCManFM/libfm on purpose.
 
@@ -789,7 +789,7 @@ show_trash=1
 show_mounts=0
 ```
 
-Parsing rules: an unknown enum string or out-of-range number falls back to the default and logs one warning; a corrupt file is renamed to `tallboy.conf.broken` and defaults are used. Round-trip (`load → save → load`) must be identity.
+Parsing rules: an unknown enum string or out-of-range number falls back to the default and logs one warning; a corrupt file is renamed to `trek.conf.broken` and defaults are used. Round-trip (`load → save → load`) must be identity.
 
 ---
 
@@ -798,7 +798,7 @@ Parsing rules: an unknown enum string or out-of-range number falls back to the d
 **Rust**
 
 - `cargo fmt` defaults. `cargo clippy --workspace --all-targets -- -D warnings`.
-- `#![deny(unsafe_code)]` in `tallboy-core` and `tallboy-fs`. No hand-written `unsafe` anywhere; if a binding genuinely forces it, isolate it in one function with a `// SAFETY:` comment and note it in SCOPE.md.
+- `#![deny(unsafe_code)]` in `trek-core` and `trek-fs`. No hand-written `unsafe` anywhere; if a binding genuinely forces it, isolate it in one function with a `// SAFETY:` comment and note it in SCOPE.md.
 - No `unwrap()`/`expect()`/`panic!` outside tests, except `expect` on true invariants with a message saying why it cannot fail. Enable `clippy::unwrap_used` in `core` and `fs`.
 - Errors: `thiserror` enums per module in `core`/`fs`. The UI converts them to user-facing messages in one place (`dialogs/error.rs`). Never show a `Debug` dump to the user; never swallow an error silently — log it at least.
 - No `String` paths for user files in `fs` APIs beyond URIs; convert at the boundary with `gio::File::for_uri` / `for_path`. Never assume file names are UTF-8: use display/edit names for text, raw names for operations.
@@ -827,19 +827,19 @@ Parsing rules: an unknown enum string or out-of-range number falls back to the d
 
 ## 11. Testing and verification
 
-**`tallboy-core` — unit tests, exhaustive.** Sort comparator (folders-first in both directions, mingle, case, natural order, ties); `SortSpec` and all enum string codecs; unique-name generation; extension splitting (`archive.tar.gz`, dotfiles, no extension); size formatting in both unit systems; permission strings; glob matcher; `Location::parse` (paths, `~`, relative, URIs, virtual schemes); history (back/forward/truncate-on-navigate); `search://` codec round-trip and every predicate; custom-action parsing, conditions and `Exec` expansion from fixture files; wallpaper geometry for all seven modes; desktop grid layout with pinned items.
+**`trek-core` — unit tests, exhaustive.** Sort comparator (folders-first in both directions, mingle, case, natural order, ties); `SortSpec` and all enum string codecs; unique-name generation; extension splitting (`archive.tar.gz`, dotfiles, no extension); size formatting in both unit systems; permission strings; glob matcher; `Location::parse` (paths, `~`, relative, URIs, virtual schemes); history (back/forward/truncate-on-navigate); `search://` codec round-trip and every predicate; custom-action parsing, conditions and `Exec` expansion from fixture files; wallpaper geometry for all seven modes; desktop grid layout with pinned items.
 
-**`tallboy-fs` — integration tests on temp dirs, headless.** `FileMeta` extraction (regular, dir, symlink, broken symlink, hidden, backup, non-UTF-8 name); folder load of 5,000 files arrives complete; monitor reports create/modify/delete/rename; jobs: copy tree, merge directories, every conflict answer, apply-to-all, self-copy auto-rename, copy-into-self rejection, cancel mid-file leaves no partial, pause/resume, move with forced copy+delete fallback, link, delete, recursive attribute change, count; settings round-trip, corrupt-file recovery, unknown-key preservation, dir-settings; bookmarks parse/write; thumbnail cache path (the §8.19 vector), validity check, fail marker, generation of a PNG with correct tEXt chunks; templates discovery; archivers/terminals list parsing.
+**`trek-fs` — integration tests on temp dirs, headless.** `FileMeta` extraction (regular, dir, symlink, broken symlink, hidden, backup, non-UTF-8 name); folder load of 5,000 files arrives complete; monitor reports create/modify/delete/rename; jobs: copy tree, merge directories, every conflict answer, apply-to-all, self-copy auto-rename, copy-into-self rejection, cancel mid-file leaves no partial, pause/resume, move with forced copy+delete fallback, link, delete, recursive attribute change, count; settings round-trip, corrupt-file recovery, unknown-key preservation, dir-settings; bookmarks parse/write; thumbnail cache path (the §8.19 vector), validity check, fail marker, generation of a PNG with correct tEXt chunks; templates discovery; archivers/terminals list parsing.
 
 Trash, mounts and remote schemes depend on the host's GVFS: gate those tests behind an env var and cover them in QA.md.
 
-**UI — smoke test + manual QA.** With `TALLBOY_SMOKE=1` the binary opens the given folder, waits for the first load to finish, then quits with status 0. `scripts/check.sh` runs it with `G_DEBUG=fatal-criticals` under a headless Wayland compositor when one is installed (`weston --backend=headless`, or `cage`), and skips with a visible notice otherwise. A GTK critical is a failure.
+**UI — smoke test + manual QA.** With `TREK_SMOKE=1` the binary opens the given folder, waits for the first load to finish, then quits with status 0. `scripts/check.sh` runs it with `G_DEBUG=fatal-criticals` under a headless Wayland compositor when one is installed (`weston --backend=headless`, or `cage`), and skips with a visible notice otherwise. A GTK critical is a failure.
 
 `.planning/QA.md` is a checklist you extend in every slice: concrete steps and expected results for everything that cannot be automated (menus, DnD, clipboard interop with another file manager, volumes, desktop). Run through the slice's section before marking it done, and state in the commit message what was verified by hand versus by test.
 
-**Fixture.** `scripts/mkfixture.sh` creates `/tmp/tallboy-fixture/`: `big/` (50,000 small files), `deep/` (20 levels), `images/` (500 generated PNGs), `names/` (unicode, very long, hidden, `backup~`, spaces, leading dashes, newline in name), `links/` (file link, dir link, broken link, loop), `perm/` (unreadable dir, read-only file).
+**Fixture.** `scripts/mkfixture.sh` creates `/tmp/trek-fixture/`: `big/` (50,000 small files), `deep/` (20 levels), `images/` (500 generated PNGs), `names/` (unicode, very long, hidden, `backup~`, spaces, leading dashes, newline in name), `links/` (file link, dir link, broken link, loop), `perm/` (unreadable dir, read-only file).
 
-**Tracing.** `TALLBOY_TRACE=1` logs milliseconds from process start to first frame, and per-folder time to first batch and to load-finished. Use it to check §13.
+**Tracing.** `TREK_TRACE=1` logs milliseconds from process start to first frame, and per-folder time to first batch and to load-finished. Use it to check §13.
 
 ---
 
@@ -847,11 +847,11 @@ Trash, mounts and remote schemes depend on the host's GVFS: gate those tests beh
 
 Vertical slices. Each ends runnable, tested and committed.
 
-**0 — Scaffold.** Workspace, three crates, dependency pins, release profile, `scripts/check.sh`, `README.md` with build deps, `COPYING`, `.planning/SCOPE.md` and `QA.md`. `tallboy` opens an empty `ApplicationWindow` with the full menu bar from §8.2 wired to stub actions that log their name. App ID, logging bridge, `TALLBOY_SMOKE`.
-*Done when:* `check.sh` passes; every menu item exists with the right label and accelerator; a second `tallboy` invocation is received by the first.
+**0 — Scaffold.** Workspace, three crates, dependency pins, release profile, `scripts/check.sh`, `README.md` with build deps, `COPYING`, `.planning/SCOPE.md` and `QA.md`. `trek` opens an empty `ApplicationWindow` with the full menu bar from §8.2 wired to stub actions that log their name. App ID, logging bridge, `TREK_SMOKE`.
+*Done when:* `check.sh` passes; every menu item exists with the right label and accelerator; a second `trek` invocation is received by the first.
 
-**1 — Core foundations and settings.** `core::config` with all of §9, codecs, `sort`, `naming`, `format`, `glob`, `location`, `history`. `fs::settings_store` (load chain, atomic save, profiles, dir-settings). `tallboy::settings::Settings` with change notification and debounced save. Window geometry persists.
-*Done when:* core tests for these modules pass; editing `tallboy.conf` by hand changes startup state; `--profile x` uses a separate directory and a separate instance.
+**1 — Core foundations and settings.** `core::config` with all of §9, codecs, `sort`, `naming`, `format`, `glob`, `location`, `history`. `fs::settings_store` (load chain, atomic save, profiles, dir-settings). `trek::settings::Settings` with change notification and debounced save. Window geometry persists.
+*Done when:* core tests for these modules pass; editing `trek.conf` by hand changes startup state; `--profile x` uses a separate directory and a separate instance.
 
 **2 — Folder loading and the icon view.** `fs::meta`, `fs::folder` (async batches, cancel, monitor, coalescing, mount-on-demand). `FileItem`. Model stack. Icon-view `GridView` with theme icons and names. Double-click/Enter navigates into folders. Status bar counts and free space. Empty/error placeholders.
 *Done when:* `fixture/big` loads without a frozen frame and scrolls smoothly; creating/deleting/renaming a file in a terminal updates the view within a second; deleting the open folder moves the tab to its parent.
@@ -863,7 +863,7 @@ Vertical slices. Each ends runnable, tested and committed.
 *Done when:* switching modes preserves selection and scroll position; sort state stays in sync between menu and column headers; "Preserve This Folder's Settings" survives restart.
 
 **5 — Opening files.** `fs::apps`, default-app launch with grouping and launch context, Open With dialog and submenu, executable and launcher prompts, terminal support with `terminals.list`, Run a Command, positional CLI arguments, `-n`, daemon mode, signals.
-*Done when:* `tallboy file.txt dir/ sftp://…` does the right thing from a second invocation with relative paths; setting a default app sticks system-wide.
+*Done when:* `trek file.txt dir/ sftp://…` does the right thing from a second invocation with relative paths; setting a default app sticks system-wide.
 
 **6 — Job engine and core operations.** `fs::jobs` complete with tests. Progress, conflict and error dialogs. Trash, Remove, Rename, Create New Folder/Empty File, Create Link, Move to, Copy to, Copy Path(s). Confirmations.
 *Done when:* all job tests pass; copying `fixture/big` shows live progress, pauses, resumes, cancels cleanly; every conflict option behaves; the UI stays responsive throughout.
@@ -881,7 +881,7 @@ Vertical slices. Each ends runnable, tested and committed.
 *Done when:* folder sizes count live and cancel on close; chmod on a mixed selection applies correctly; values match `stat`.
 
 **11 — Thumbnails.** `fs::thumbs` in full with tests; binding-driven scheduling; LRU; settings.
-*Done when:* `fixture/images` fills in progressively without stutter; a second visit is instant; thumbnails written by `tallboy` are reused by another file manager and vice versa.
+*Done when:* `fixture/images` fills in progressively without stutter; a second visit is instant; thumbnails written by `trek` are reused by another file manager and vice versa.
 
 **12 — Dual pane and remaining window features.** Dual pane with active-pane tracking, F6 focus cycling, Fullscreen, Keyboard Navigation help, About.
 *Done when:* every `win.*` file action demonstrably targets the active pane; no tab or folder leaks after closing panes (debug counter).
@@ -911,7 +911,7 @@ Vertical slices. Each ends runnable, tested and committed.
 - Every item in §8 implemented; every deviation from upstream listed in SCOPE.md.
 - `scripts/check.sh` green: fmt, clippy `-D warnings`, all tests, smoke.
 - Full QA.md pass on Fedora + Hyprland, and the main window verified once under X11.
-- **Performance budgets** (release build, warm cache, measured with `TALLBOY_TRACE`):
+- **Performance budgets** (release build, warm cache, measured with `TREK_TRACE`):
   - process start → first frame of a window on `$HOME`: ≤ 300 ms
   - `/usr/bin`-sized folder (≈3,000 entries): load finished ≤ 150 ms
   - `fixture/big` (50,000 entries): first batch visible ≤ 100 ms, fully loaded and sorted ≤ 1.5 s, no single main-loop stall > 50 ms, scrolling stays smooth
@@ -919,7 +919,7 @@ Vertical slices. Each ends runnable, tested and committed.
   - memory: growth per additional 10,000 listed files ≤ 15 MB; closing a tab returns to within a few MB of baseline
   - copy throughput within 10% of `cp -a` on the same local disk
 - No GTK warnings or criticals on stderr during a normal session.
-- A PCManFM user can run `tallboy --import-pcmanfm`, launch `tallboy`, and work.
+- A PCManFM user can run `trek --import-pcmanfm`, launch `trek`, and work.
 
 ---
 

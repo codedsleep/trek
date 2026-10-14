@@ -1,8 +1,8 @@
 # org.freedesktop.FileManager1 (SCOPE 9.7), on the private session bus. Run with:
-#   scripts/agent-run.sh --env TALLBOY_FILEMANAGER1=1 -- --daemon-mode < scripts/agent/checks/filemanager1.sh
+#   scripts/agent-run.sh --env TREK_FILEMANAGER1=1 -- --daemon-mode < scripts/agent/checks/filemanager1.sh
 # Without the variable the agent profile must not own the name:
 #   EXPECT_OWNED=0 scripts/agent-run.sh -- --daemon-mode < scripts/agent/checks/filemanager1.sh
-F="$HOME/.cache/tallboy-fixture"
+F="$HOME/.cache/trek-fixture"
 fm() {
     gdbus call --session --dest org.freedesktop.FileManager1 \
         --object-path /org/freedesktop/FileManager1 \

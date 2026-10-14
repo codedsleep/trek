@@ -1,9 +1,9 @@
-# Drag and drop inside one tallboy window (SCOPE 7.10, 7.11). Run with:
-#   scripts/agent-run.sh -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/dnd.sh
+# Drag and drop inside one trek window (SCOPE 7.10, 7.11). Run with:
+#   scripts/agent-run.sh -- ~/.cache/trek-fixture/names < scripts/agent/checks/dnd.sh
 # Positions assume the default 1280x720 output and icon view: items sit
 # 141 px apart from x=222 at y=145. Drags between applications cannot be
 # checked here; they are owner QA.
-D=$(mktemp -d "$HOME/.cache/tallboy-agent/dnd-XXXXXX")
+D=$(mktemp -d "$HOME/.cache/trek-agent/dnd-XXXXXX")
 mkdir "$D/dest1" "$D/dest2"
 for name in a b c d e; do printf '%s\n' "$name" >"$D/$name.txt"; done
 col() { echo $((222 + 141 * $1)); }
