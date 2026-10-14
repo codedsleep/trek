@@ -1,0 +1,74 @@
+name: Bug report
+description: Something in trek is broken or behaving unexpectedly.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more concrete the repro, the faster the fix.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear, concise description of the bug. Include screenshots, or the crash log from `~/.local/state/trek/crash.log` if trek crashed.
+      placeholder: |
+        After `yy` on a folder and `p` in another tab, the progress window stayed at 0% until I pressed Esc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: A minimal sequence of keys or clicks that triggers the issue.
+      placeholder: |
+        1. `trek ~/Downloads`
+        2. `v`, `j` `j`, `y`
+        3. `tt`, `gh`, `p`
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: trek version
+      description: The release tag you installed, or the commit SHA if built from source.
+      placeholder: "v0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: desktop
+    attributes:
+      label: Compositor or desktop
+      description: Hyprland, sway, GNOME, KDE Plasma, …
+      placeholder: "Hyprland 0.51"
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: |
+        Run and paste:
+        - `uname -a`
+        - `pkg-config --modversion gtk4` (or your distribution's GTK 4 package version)
+        - `echo $XDG_SESSION_TYPE $GTK_THEME`
+        - rustc version if built from source
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: What trek printed in the terminal. Re-run with `TREK_TRACE=1` if helpful.
+      render: shell
