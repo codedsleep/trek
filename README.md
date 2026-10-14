@@ -279,9 +279,15 @@ Two things the lock does not cover and the review will not change:
   monitor's scale needs.
 - There is no desktop manager: tallboy does not draw a wallpaper or desktop
   icons, and `--desktop` says so.
-- It is dark. It follows the GTK 4 theme and has no colours of its own, but
-  always asks for the theme's dark variant, whatever the desktop prefers.
-  `GTK_THEME=Adwaita:light` gives the light one for a single run.
+- It is dark, in the colours of the desktop's GTK theme. A theme with a
+  GTK 4 part is loaded by GTK, in its dark variant when it has one. A theme
+  written for GTK 3 only, which is what PCManFM draws with, cannot be loaded
+  by GTK 4: tallboy then takes the colours the theme names (`@define-color
+  theme_bg_color` and the rest) and recolours GTK 4's own stylesheet with
+  them. The palette is the theme's; the shapes and spacing of buttons, tabs
+  and menus stay GTK 4's. The theme is read at start-up, so a change of
+  theme shows after a restart. `GTK_THEME=Adwaita:light` gives GTK's own
+  light look for a single run.
 - X11 works through XWayland with `GDK_BACKEND=x11`, but Wayland is what it is
   used and tested on.
 
@@ -300,7 +306,7 @@ in `.planning/SCOPE.md` §10, in the same order.
 7. No external thumbnailers
 8. Owns `org.freedesktop.FileManager1`
 9. Recursive delete stops and asks at a mount point
-10. Follows the system GTK 4 theme, which is not the GTK 3 theme PCManFM uses
+10. Follows the desktop's GTK theme: a theme with a GTK 4 part as it is, a GTK 3 theme by its colours only, on GTK 4's own widget shapes
 11. Bookmarks ▸ Edit Bookmarks… exists; PCManFM 1.4.0 edits bookmarks only from the side pane
 12. Compact view columns are all the same width and long names are ellipsised; upstream fits each column to its longest name. GTK 4's `GridView` has uniform cells
 13. The selection highlight covers the whole grid cell, as GTK 4 themes draw it, not only the icon and name

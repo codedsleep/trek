@@ -19,6 +19,7 @@ mod ops;
 mod settings;
 mod sidepane;
 mod tab;
+mod theme;
 mod view;
 mod volumes;
 mod window;

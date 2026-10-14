@@ -17,7 +17,9 @@
 # applications seen here are the dev profile's, not the real ones. What
 # tallboy starts (the terminal, the editor, applications) gets the owner's
 # own XDG directories and session bus back through TALLBOY_HOST_*, so nvim
-# and kitty come up with their real configuration.
+# and kitty come up with their real configuration. The desktop's GTK theme
+# is one more thing the private session cannot ask for; its name goes in as
+# TALLBOY_GTK_THEME (set it yourself to try another theme).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 dev_home="$HOME/.cache/vim-centric-fm-dev"
@@ -35,6 +37,11 @@ if [[ $build == release ]]; then cargo build --release -p tallboy; else cargo bu
 "$root/scripts/mkfixture.sh" >/dev/null
 mkdir -p "$dev_home"/{config,cache,data,state}
 unset TALLBOY_UNLOCKED
+if [[ -z ${TALLBOY_GTK_THEME-} ]] && command -v gsettings >/dev/null; then
+    theme=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null) || theme=
+    theme=${theme#\'} theme=${theme%\'}
+    [[ -z $theme ]] || export TALLBOY_GTK_THEME="$theme"
+fi
 for name in XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME DBUS_SESSION_BUS_ADDRESS; do
     export "TALLBOY_HOST_$name=${!name-}"
 done

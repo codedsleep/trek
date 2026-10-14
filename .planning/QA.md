@@ -71,7 +71,7 @@ Run `scripts/dev-run.sh`. The side pane is empty and there is no toolbar yet; bo
 - [ ] **Live updates.** With `live` open, run `touch ~/.cache/tallboy-fixture/live/x` in a terminal: the file appears. Delete it: it goes.
 - [ ] **Errors.** `perm/unreadable` shows "Permission denied." and a Retry button.
 - [ ] **Window state.** Resize the window, drag the splitter, close, start again: size and splitter are as you left them.
-- [ ] **Look.** tallboy follows the GTK 4 theme, so it does not match your NordArc PCManFM (DISCOVERY D20). Say so if anything is unreadable rather than merely different.
+- [ ] **Look.** tallboy has the colours of your GTK theme (NordArc) on GTK 4's own widget shapes, so it is close to PCManFM without matching it (SCOPE §12 "Theme"). Say so if anything is unreadable or has the wrong colour rather than merely a different shape.
 
 ---
 

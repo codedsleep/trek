@@ -14,6 +14,7 @@ pub mod keymap;
 pub mod location;
 pub mod naming;
 pub mod open;
+pub mod palette;
 pub mod perms;
 pub mod sort;
 pub mod transfer;

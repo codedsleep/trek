@@ -82,6 +82,32 @@ one() {
             run_session --env TALLBOY_FILEMANAGER1=1 -- --daemon-mode <"$checks/filemanager1.sh"
             EXPECT_OWNED=0 run_session -- --daemon-mode <"$checks/filemanager1.sh"
             ;;
+        theme)
+            # Read at start-up, so the themes are there before the session.
+            themes="$agent/data/themes"
+            rm -rf -- "$themes"
+            mkdir -p "$themes"/Tallboy{Three,Light,Unreadable}/gtk-3.0 "$themes/TallboyFour/gtk-4.0"
+            printf '@define-color %s;\n' 'theme_bg_color #203040' 'theme_base_color #102030' \
+                'theme_fg_color #d0d8e0' 'theme_text_color @theme_fg_color' \
+                'theme_selected_bg_color #c08040' 'theme_selected_fg_color rgba(0, 0, 0, 0.87)' \
+                >"$themes/TallboyThree/gtk-3.0/gtk.css"
+            printf '@define-color %s;\n' 'theme_bg_color #f0ece4' 'theme_base_color #ffffff' \
+                'theme_fg_color #303030' 'theme_selected_bg_color #a05020' \
+                >"$themes/TallboyLight/gtk-3.0/gtk.css"
+            printf '@define-color %s;\n' 'theme_bg_color shade(#203040, 1.2)' 'theme_fg_color #d0d8e0' \
+                >"$themes/TallboyUnreadable/gtk-3.0/gtk.css"
+            printf '%s\n' '@define-color theme_selected_bg_color #4080c0;' \
+                '@define-color theme_selected_fg_color white;' '@define-color theme_fg_color white;' \
+                '@define-color success_color green;' '@define-color error_color red;' \
+                '.view { background-color: #402030; color: white; }' \
+                >"$themes/TallboyFour/gtk-4.0/gtk.css"
+            for theme in gtk3:Three gtk4:Four light:Light unreadable:Unreadable missing:Missing; do
+                seed
+                THEME_CASE=${theme%:*} run_session --env "TALLBOY_GTK_THEME=Tallboy${theme#*:}" \
+                    -- "$fixture/names" <"$checks/theme.sh"
+            done
+            rm -rf -- "$themes"
+            ;;
         *) seed "$classic"; run_session --keep -- "$fixture/names" <"$checks/$name.sh" ;;
     esac
 }
@@ -89,7 +115,7 @@ one() {
 names=("$@")
 if [[ ${#names[@]} -eq 0 ]]; then
     names=(vim finder navigation opening single-click fileops dnd dnd-ask progress menus sidepane
-        properties dual-pane prefs leaks filemanager1 session)
+        properties dual-pane prefs theme leaks filemanager1 session)
 fi
 failed=0
 for name in "${names[@]}"; do
