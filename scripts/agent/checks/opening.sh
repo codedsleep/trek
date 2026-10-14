@@ -26,7 +26,9 @@ printf 'a\n' >"$work/files/one.txt"; printf 'b\n' >"$work/files/two.txt"
 cp "$F/images/image-000.png" "$work/files/pic.png"
 printf 'x\n' >"$work/files/; touch pwned"
 printf '#!/bin/sh\ntouch "%s/script-ran"\n' "$work" >"$work/files/script.sh"; chmod +x "$work/files/script.sh"
-head -c 64 /dev/urandom >"$work/files/data.tbunknown"
+# Bytes no content test takes for a known type. Random ones are, now and
+# then: 64 from /dev/urandom have come out as text/x-matlab.
+printf '\0\1\2\3tallboy\0\377\376\0\0' >"$work/files/data.tbunknown"
 printf '[Desktop Entry]\nType=Application\nName=Loose launcher\nExec=touch %s/launcher-ran\n' "$work" >"$work/files/loose.desktop"
 log() { cat "$OUT/launch.log"; }
 loc() { state | grep -o 'location=[^ ]*'; }
