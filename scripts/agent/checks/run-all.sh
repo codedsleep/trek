@@ -55,7 +55,8 @@ one() {
             ;;
         opening)
             seed "$classic"
-            run_session --keep --env "TERMINAL=$agent/opening/bin/fake-term" -- "$fixture/names" <"$checks/opening.sh"
+            run_session --keep --env "TERMINAL=$agent/opening/bin/fake-term" \
+                --env "VISUAL=$agent/opening/bin/fake-edit" -- "$fixture/names" <"$checks/opening.sh"
             ;;
         single-click)
             seed "[config]\nsingle_click=1\nauto_selection_delay=300\n$classic"

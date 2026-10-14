@@ -153,8 +153,9 @@ is `/` now.
   a progress window that can pause and cancel, conflict questions and error
   handling; cut, copy and paste that other file managers understand;
   drag and drop with Ctrl, Shift and an ask menu.
-- **Opening.** Default applications, Open With, the executable-file question,
-  a terminal in the current folder, Run a Command.
+- **Opening.** Text files in your editor (`$VISUAL`, `$EDITOR` or nvim) in a
+  terminal; default applications and Open With for the rest, the
+  executable-file question, a terminal in the current folder, Run a Command.
 - **Volumes and remote places.** Mount, unmount and eject; automount and the
   autorun question for inserted media; Connect to Server for SSH, FTP, WebDAV
   and Windows shares through GVFS.
@@ -314,6 +315,7 @@ in `.planning/SCOPE.md` §10, in the same order.
 25. Passwords embedded in a location’s userinfo are rejected; credentials must be entered through the mount prompt
 26. Recursive permission changes prepare the tree and visit children before parents; an inaccessible subtree cannot be repaired by granting access recursively
 27. A listing error after an initial batch leaves the partial view in Loading; partial-result error presentation awaits an owner decision
+28. Text files open in the editor (`$VISUAL`, then `$EDITOR`, then `nvim`) in the terminal, whatever application is set for their type; that includes executable scripts, which are no longer offered for execution unless `quick_exec=1`. Pictures written in XML (SVG) keep their applications. An application with `Terminal=true` is started in tallboy's terminal, not one from GIO's list
 
 ## Layout of the source
 

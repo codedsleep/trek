@@ -38,6 +38,7 @@ pub fn app(error: &AppError) -> String {
         ),
         AppError::Gio(e) => io(e),
         AppError::Location(e) => e.to_string(),
+        AppError::Terminal(e) => terminal(e),
         AppError::Invalid => "This is not a valid application launcher or command.".into(),
     }
 }
@@ -63,6 +64,9 @@ pub fn terminal(error: &TerminalError) -> String {
         TerminalError::NoHold => {
             "This terminal cannot keep its window open after the command.".into()
         }
+        TerminalError::NoEditor(program) => format!(
+            "The text editor \"{program}\" was not found. Set $VISUAL or $EDITOR to the editor to use."
+        ),
         TerminalError::List(line) => format!("The terminal list has a bad line: {line}"),
     }
 }

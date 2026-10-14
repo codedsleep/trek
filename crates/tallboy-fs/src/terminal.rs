@@ -36,6 +36,9 @@ pub enum TerminalError {
     /// Hold-open cannot be implemented without terminal support.
     #[error("This terminal does not support keeping its window open")]
     NoHold,
+    /// Text editor is not installed.
+    #[error("Text editor not found: {0}")]
+    NoEditor(String),
     /// Invalid terminal list.
     #[error("Invalid terminal list line: {0}")]
     List(String),
@@ -123,6 +126,29 @@ pub fn resolve(
         exec_args: entry.map_or_else(|| vec!["-e".into()], |e| e.exec_args.clone()),
         hold_args: entry.map_or(vec![], |e| e.hold_args.clone()),
     })
+}
+/// Editor used when neither VISUAL nor EDITOR names one.
+pub const DEFAULT_EDITOR: &str = "nvim";
+/// Resolve the text editor's argv: VISUAL, then EDITOR, then nvim.
+/// A named editor that is not installed yields NoEditor rather than silently choosing another.
+pub fn editor(
+    visual: Option<&str>,
+    editor: Option<&str>,
+    is_installed: impl Fn(&OsStr) -> bool,
+) -> Result<Vec<OsString>, TerminalError> {
+    let command = [visual, editor]
+        .into_iter()
+        .flatten()
+        .find(|s| !s.trim().is_empty())
+        .unwrap_or(DEFAULT_EDITOR);
+    let argv: Vec<OsString> = glib::shell_parse_argv(command)?.into_iter().collect();
+    let program = argv.first().ok_or(TerminalError::Empty)?;
+    if !is_installed(program) {
+        return Err(TerminalError::NoEditor(
+            program.to_string_lossy().into_owned(),
+        ));
+    }
+    Ok(argv)
 }
 impl Terminal {
     /// Construct terminal argv for a command; paths are appended as individual arguments.

@@ -62,11 +62,42 @@ fn apps_fixture_subprocess() {
     let ctx = glib::MainContext::new();
     ctx.with_thread_default(|| {
         ctx.block_on(async {
-            apps::launch(&groups, Some(&gio::AppLaunchContext::new()))
+            let none = || Err(terminal::TerminalError::Missing);
+            apps::launch(&groups, Some(&gio::AppLaunchContext::new()), none)
+                .await
+                .unwrap();
+            // An entry with Terminal=true runs in the terminal it is given,
+            // which GIO's own list of terminals would never find.
+            fs::write(
+                data.join("gamma.desktop"),
+                "[Desktop Entry]\nType=Application\nName=gamma\nExec=/usr/bin/true %F\nTerminal=true\n",
+            )
+            .unwrap();
+            let gamma =
+                gio_unix::DesktopAppInfo::from_filename(data.join("gamma.desktop")).unwrap();
+            let in_terminal = vec![apps::LaunchGroup {
+                app: gamma.upcast(),
+                files: vec![gio::File::for_path(root.join(names[1]))],
+            }];
+            assert!(matches!(
+                apps::launch(&in_terminal, None, none).await,
+                Err(apps::AppError::Terminal(terminal::TerminalError::Missing))
+            ));
+            let recording = terminal::Terminal {
+                argv: vec![
+                    "/usr/bin/python3".into(),
+                    recorder.clone().into(),
+                    output.clone().into(),
+                    "100%".into(),
+                ],
+                exec_args: vec!["-e".into()],
+                hold_args: vec![],
+            };
+            apps::launch(&in_terminal, None, || Ok(recording.clone()))
                 .await
                 .unwrap();
             for _ in 0..100 {
-                if fs::read_to_string(&output).is_ok_and(|s| s.lines().count() == 2) {
+                if fs::read_to_string(&output).is_ok_and(|s| s.lines().count() == 3) {
                     break;
                 }
                 glib::timeout_future(Duration::from_millis(20)).await;
@@ -75,8 +106,13 @@ fn apps_fixture_subprocess() {
     })
     .unwrap();
     let text = fs::read_to_string(output).unwrap();
-    assert_eq!(text.lines().count(), 2);
+    assert_eq!(text.lines().count(), 3);
     assert!(text.contains("; rm -rf ~"));
+    let wrapped = format!(
+        r#"["100%", "-e", "/usr/bin/true", "{}"]"#,
+        root.join(names[1]).display()
+    );
+    assert!(text.lines().any(|line| line == wrapped), "{text}");
     assert!(apps::custom("/usr/bin/python3 --version", "Python", false).is_ok());
     assert!(apps::default("application/x-tallboy-none", false).is_none());
 }
@@ -104,6 +140,17 @@ fn terminal_argv_has_no_shell_interpolation() {
             .argv[0],
         "xterm"
     );
+    let editor = |visual, editor| terminal::editor(visual, editor, |p| p != "missing");
+    assert_eq!(editor(None, None).unwrap(), ["nvim"]);
+    assert_eq!(editor(Some(" "), Some("hx")).unwrap(), ["hx"]);
+    assert_eq!(
+        editor(Some("code --wait"), Some("hx")).unwrap(),
+        ["code", "--wait"]
+    );
+    assert!(matches!(
+        editor(None, Some("missing -p")),
+        Err(terminal::TerminalError::NoEditor(program)) if program == "missing"
+    ));
     let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
     fs::create_dir_all(&root).unwrap();
     let t = tempfile::tempdir_in(root).unwrap();

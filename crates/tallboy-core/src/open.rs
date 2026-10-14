@@ -46,8 +46,8 @@ pub enum Activation {
     OpenWith,
     /// Execute without prompting.
     Execute,
-    /// Script prompt includes Open.
-    AskScript,
+    /// Text editor.
+    Edit,
     /// Binary prompt.
     AskBinary,
     /// Trusted launcher.
@@ -65,7 +65,8 @@ pub fn synthetic_execution(native: bool, filesystem: Option<&str>) -> bool {
             )
         })
 }
-/// Apply executable and removable-media policy before choosing a default app.
+/// Apply executable and removable-media policy, then send text to the editor,
+/// before choosing a default app.
 pub fn classify(item: &Item, quick_exec: bool) -> Activation {
     match item.kind {
         Kind::Directory => Activation::Navigate,
@@ -81,17 +82,16 @@ pub fn classify(item: &Item, quick_exec: bool) -> Activation {
             }
         }
         Kind::Text | Kind::Binary => {
-            if item.executable
-                && !(item.kind == Kind::Text
-                    && synthetic_execution(item.native, item.filesystem.as_deref()))
-            {
-                if quick_exec {
-                    Activation::Execute
-                } else if item.kind == Kind::Text {
-                    Activation::AskScript
-                } else {
-                    Activation::AskBinary
-                }
+            let text = item.kind == Kind::Text;
+            let runnable = item.executable
+                && !(text && synthetic_execution(item.native, item.filesystem.as_deref()));
+            if runnable && quick_exec {
+                Activation::Execute
+            } else if runnable && !text {
+                Activation::AskBinary
+            } else if text && item.native {
+                // Text is edited, scripts included: the editor needs a path.
+                Activation::Edit
             } else if item.has_default {
                 Activation::LaunchDefault
             } else {
@@ -118,7 +118,7 @@ mod tests {
             (Kind::Shortcut, Activation::FollowTarget),
             (Kind::Mountable, Activation::Mount),
             (Kind::Launcher, Activation::LaunchLauncher),
-            (Kind::Text, Activation::AskScript),
+            (Kind::Text, Activation::Edit),
             (Kind::Binary, Activation::AskBinary),
         ] {
             i.kind = kind;
@@ -127,13 +127,23 @@ mod tests {
         i.kind = Kind::Text;
         assert_eq!(classify(&i, true), Activation::Execute);
         i.filesystem = Some("vfat".into());
-        assert_eq!(classify(&i, true), Activation::LaunchDefault);
+        assert_eq!(classify(&i, true), Activation::Edit);
+        i.native = false;
+        assert_eq!(classify(&i, false), Activation::LaunchDefault);
+        i.native = true;
         i.kind = Kind::Launcher;
         i.in_applications = true;
         assert_eq!(classify(&i, true), Activation::ConfirmLauncher);
         i.kind = Kind::Text;
         i.has_default = false;
+        assert_eq!(classify(&i, false), Activation::Edit);
+        i.native = false;
         assert_eq!(classify(&i, false), Activation::OpenWith);
+        i.native = true;
+        i.kind = Kind::Binary;
+        i.executable = false;
+        assert_eq!(classify(&i, true), Activation::OpenWith);
+        i.executable = true;
         i.filesystem = Some("btrfs".into());
         i.kind = Kind::Launcher;
         i.executable = false;

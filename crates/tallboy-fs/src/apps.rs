@@ -1,6 +1,7 @@
 //! Default applications, grouping, and launches with caller-owned launch contexts.
+use crate::terminal::{Terminal, TerminalError};
 use gio::prelude::*;
-use std::path::Path;
+use std::{ffi::OsString, path::Path};
 use tallboy_core::location::Location;
 /// Application lookup or launch failure.
 #[derive(Debug, thiserror::Error)]
@@ -14,6 +15,9 @@ pub enum AppError {
     /// Malformed or blocked file location.
     #[error(transparent)]
     Location(#[from] tallboy_core::location::LocationError),
+    /// No terminal for an application that needs one.
+    #[error(transparent)]
+    Terminal(#[from] TerminalError),
     /// Invalid launcher or command.
     #[error("Invalid application launcher or empty command")]
     Invalid,
@@ -64,19 +68,51 @@ pub fn group(
     }
     Ok(groups)
 }
+/// The application to start for `app`: itself, or for a desktop entry with
+/// `Terminal=true` a command line that runs it in `terminal`. GIO looks for a
+/// terminal in a fixed list of its own (no kitty, alacritty or foot) and starts
+/// nothing when none of them is installed. GIO still expands the field codes.
+fn in_terminal(
+    app: &gio::AppInfo,
+    terminal: impl FnOnce() -> Result<Terminal, TerminalError>,
+) -> Result<gio::AppInfo, AppError> {
+    // An application made from a command line has no key file to ask.
+    let wanted = app
+        .downcast_ref::<gio_unix::DesktopAppInfo>()
+        .is_some_and(|entry| entry.filename().is_some() && entry.boolean("Terminal"));
+    let Some(exec) = app.commandline().filter(|_| wanted) else {
+        return Ok(app.clone());
+    };
+    let terminal = terminal()?;
+    let mut line = OsString::new();
+    for argument in terminal.argv.iter().chain(&terminal.exec_args) {
+        let quoted = glib::shell_quote(argument);
+        line.push(quoted.to_string_lossy().replace('%', "%%"));
+        line.push(" ");
+    }
+    line.push(exec);
+    Ok(gio::AppInfo::create_from_commandline(
+        line,
+        Some(&app.name()),
+        gio::AppInfoCreateFlags::NONE,
+    )?)
+}
 /// Launch each group once, with startup/activation context supplied by the GTK layer.
+/// `terminal` is asked only for applications that run in one.
 pub async fn launch(
     groups: &[LaunchGroup],
     context: Option<&gio::AppLaunchContext>,
+    terminal: impl Fn() -> Result<Terminal, TerminalError>,
 ) -> Result<(), AppError> {
     for g in groups {
+        let app = in_terminal(&g.app, &terminal)?;
         let uris = g
             .files
             .iter()
             .map(|f| f.uri().to_string())
             .collect::<Vec<_>>();
         let refs = uris.iter().map(String::as_str).collect::<Vec<_>>();
-        g.app.launch_uris_future(&refs, context).await?;
+        app.launch_uris_future(&refs, context).await?;
     }
     Ok(())
 }
@@ -107,10 +143,12 @@ pub fn custom(command: &str, name: &str, terminal: bool) -> Result<gio::AppInfo,
 pub async fn launcher(
     file: &gio::File,
     context: Option<&gio::AppLaunchContext>,
+    terminal: impl FnOnce() -> Result<Terminal, TerminalError>,
 ) -> Result<(), AppError> {
     Location::parse(&file.uri(), Path::new("/"), Path::new("/"))?;
     let path = file.path().ok_or(AppError::Invalid)?;
     let app = gio_unix::DesktopAppInfo::from_filename(path).ok_or(AppError::Invalid)?;
+    let app = in_terminal(app.upcast_ref(), terminal)?;
     app.launch_uris_future(&[], context).await?;
     Ok(())
 }

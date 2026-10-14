@@ -351,6 +351,7 @@ Known at the start; agents append as they go.
 | 25 | Passwords embedded in a location’s userinfo are rejected; credentials must be entered through the mount prompt | DISCOVERY §7, Phase 10 |
 | 26 | Recursive permission changes prepare the tree and visit children before parents; an inaccessible subtree cannot be repaired by granting access recursively | HANDOFF-C, review decision 2 |
 | 27 | A listing error after an initial batch leaves the partial view in Loading; partial-result error presentation awaits an owner decision | HANDOFF-C, review decision 3 |
+| 28 | Text files open in the editor (`$VISUAL`, then `$EDITOR`, then `nvim`) in the terminal, whatever application is set for their type; that includes executable scripts, which are no longer offered for execution unless `quick_exec=1`. Pictures written in XML (SVG) keep their applications. An application with `Terminal=true` is started in tallboy's terminal, not one from GIO's list | Owner request, 2026-10-14 |
 
 ### Design notes that later phases depend on
 

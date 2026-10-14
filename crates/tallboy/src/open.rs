@@ -40,6 +40,22 @@ pub fn resolve_terminal(app: &App) -> Result<terminal::Terminal, terminal::Termi
     )
 }
 
+/// The text editor's command: `$VISUAL`, then `$EDITOR`, then nvim.
+fn resolve_editor() -> Result<Vec<OsString>, terminal::TerminalError> {
+    let (visual, editor) = (std::env::var("VISUAL").ok(), std::env::var("EDITOR").ok());
+    terminal::editor(visual.as_deref(), editor.as_deref(), terminal::installed)
+}
+
+/// Whether a file of this type is text to edit. Most XML formats descend
+/// from `text/plain`, SVG pictures among them; those keep their applications.
+/// An empty file has no type of its own and is text about to be written.
+fn is_text(content_type: &str) -> bool {
+    const MEDIA: [&str; 4] = ["image/", "audio/", "video/", "font/"];
+    content_type == "application/x-zerosize"
+        || gio::content_type_is_a(content_type, "text/plain")
+            && !MEDIA.iter().any(|media| content_type.starts_with(media))
+}
+
 /// Waits for a started process on a thread of its own so that it never
 /// lingers as a zombie.
 pub fn reap(mut child: Child) {
@@ -70,17 +86,20 @@ async fn facts(item: &FileItem, file: &gio::File) -> open::Item {
     let mut facts = {
         let meta = item.meta();
         let content_type = &*meta.content_type;
+        let text = is_text(content_type);
         let kind = match meta.file_type {
             gio::FileType::Directory => Kind::Directory,
             gio::FileType::Mountable => Kind::Mountable,
             gio::FileType::Shortcut => Kind::Shortcut,
             _ if content_type == "application/x-desktop" => Kind::Launcher,
-            _ if gio::content_type_is_a(content_type, "text/plain") => Kind::Text,
+            _ if text => Kind::Text,
             _ => Kind::Binary,
         };
         open::Item {
             kind,
-            executable: meta.access.execute && gio::content_type_can_be_executable(content_type),
+            // A script or a program; never a picture that happens to be XML.
+            executable: meta.access.execute
+                && (text || gio::content_type_is_a(content_type, "application/x-executable")),
             filesystem: meta.filesystem_type.as_deref().map(String::from),
             native,
             in_applications: in_applications(file),
@@ -145,7 +164,8 @@ impl Opener {
     }
 
     /// Opens activated items: one folder is entered in place, several open
-    /// as tabs, files go to their applications in one launch per application.
+    /// as tabs, text files go to the editor together, other files go to their
+    /// applications in one launch per application.
     pub fn open(&self, items: Vec<FileItem>) {
         let this = self.clone();
         let hold = self.app.gtk().hold();
@@ -159,6 +179,7 @@ impl Opener {
         let quick_exec = self.app.settings().quick_exec();
         let mut folders = Vec::new();
         let mut launch = Vec::new();
+        let mut edit = Vec::new();
         for item in items {
             let file = gio::File::for_uri(&item.meta().uri);
             match open::classify(&facts(&item, &file).await, quick_exec) {
@@ -172,14 +193,15 @@ impl Opener {
                     launch.push((file, item.meta().content_type.to_string()))
                 }
                 Activation::OpenWith => self.open_with(vec![file], &item.meta().content_type),
+                Activation::Edit => edit.push(file),
                 Activation::Execute => self.execute(&file, false),
-                Activation::AskScript => self.ask_execute(file, &item, true),
-                Activation::AskBinary => self.ask_execute(file, &item, false),
+                Activation::AskBinary => self.ask_execute(file, &item),
                 Activation::LaunchLauncher => self.launch_launcher(file),
                 Activation::ConfirmLauncher => self.confirm_launcher(file, &item),
             }
         }
         self.show_folders(folders);
+        self.edit(&edit);
         if !launch.is_empty() {
             match apps::group(&launch, apps::default) {
                 Ok(groups) => self.launch(groups),
@@ -217,7 +239,8 @@ impl Opener {
         let this = self.clone();
         glib::spawn_future_local(async move {
             let context = launch_context();
-            if let Err(e) = apps::launch(&groups, context.as_ref()).await {
+            let terminal = || resolve_terminal(&this.app);
+            if let Err(e) = apps::launch(&groups, context.as_ref(), terminal).await {
                 this.alert(
                     "The application could not be started",
                     &dialogs::error::app(&e),
@@ -260,46 +283,44 @@ impl Opener {
         }
     }
 
-    /// Upstream's "Execute File" question for scripts and binaries.
-    fn ask_execute(&self, file: gio::File, item: &FileItem, script: bool) {
+    /// Opens text files in the editor: one terminal for all of them, started
+    /// in the first file's folder.
+    fn edit(&self, files: &[gio::File]) {
+        let Some(directory) = files.first().and_then(|file| file.parent()) else {
+            return;
+        };
+        let started = resolve_editor().and_then(|mut argv| {
+            argv.extend(
+                files
+                    .iter()
+                    .filter_map(|file| file.path())
+                    .map(OsString::from),
+            );
+            resolve_terminal(&self.app)?.execute(&argv, &directory, false)
+        });
+        match started {
+            Ok(child) => reap(child),
+            Err(e) => self.terminal_failed("The text editor could not be started", &e),
+        }
+    }
+
+    /// Upstream's "Execute File" question for an executable program.
+    fn ask_execute(&self, file: gio::File, item: &FileItem) {
         let name = item.meta().display_name.clone();
         let this = self.clone();
-        let content_type = item.meta().content_type.to_string();
-        if script {
-            base::choose(
-                self.parent().as_ref(),
-                "Execute File",
-                &format!(
-                    "This text file '{name}' seems to be an executable script.\nWhat do you want to do with it?"
-                ),
-                &["Cancel", "Open", "Execute in Terminal", "Execute"],
-                0,
-                1,
-                move |choice| match choice {
-                    1 => match apps::default(&content_type, !file.is_native()) {
-                        Some(app) => this.open_with_app(vec![file], app),
-                        None => this.open_with(vec![file], &content_type),
-                    },
-                    2 => this.execute(&file, true),
-                    3 => this.execute(&file, false),
-                    _ => {}
-                },
-            );
-        } else {
-            base::choose(
-                self.parent().as_ref(),
-                "Execute File",
-                &format!("This file '{name}' is executable. Do you want to execute it?"),
-                &["Cancel", "Execute in Terminal", "Execute"],
-                0,
-                0,
-                move |choice| match choice {
-                    1 => this.execute(&file, true),
-                    2 => this.execute(&file, false),
-                    _ => {}
-                },
-            );
-        }
+        base::choose(
+            self.parent().as_ref(),
+            "Execute File",
+            &format!("This file '{name}' is executable. Do you want to execute it?"),
+            &["Cancel", "Execute in Terminal", "Execute"],
+            0,
+            0,
+            move |choice| match choice {
+                1 => this.execute(&file, true),
+                2 => this.execute(&file, false),
+                _ => {}
+            },
+        );
     }
 
     fn launch_launcher(&self, file: gio::File) {
@@ -307,7 +328,8 @@ impl Opener {
         let this = self.clone();
         glib::spawn_future_local(async move {
             let context = launch_context();
-            if let Err(e) = apps::launcher(&file, context.as_ref()).await {
+            let terminal = || resolve_terminal(&this.app);
+            if let Err(e) = apps::launcher(&file, context.as_ref(), terminal).await {
                 this.alert(
                     "The launcher could not be started",
                     &dialogs::error::app(&e),
