@@ -18,12 +18,13 @@ impl TabPage {
         self.update_preview();
     }
 
-    /// Listing options for the side columns: the tab's, with the cheap
-    /// content type, since nothing in them is opened by type.
-    fn side_options(&self) -> Options {
+    /// How every column of the tab lists a folder. They are the same for
+    /// all three, so that a listing can move from one column to the next.
+    pub(super) fn listing_options(&self) -> Options {
+        let settings = self.0.app.settings();
         Options {
-            backup_as_hidden: self.0.app.settings().backup_as_hidden(),
-            defer_content_test: true,
+            backup_as_hidden: settings.backup_as_hidden(),
+            defer_content_test: settings.defer_content_test(),
             ..Options::default()
         }
     }
@@ -68,7 +69,7 @@ impl TabPage {
             Some(parent) => {
                 inner
                     .parent
-                    .show(&parent.uri(), Some(&here.uri()), self.side_options())
+                    .show(&parent.uri(), Some(&here.uri()), self.listing_options())
             }
             None => inner.parent.clear(),
         }
@@ -83,7 +84,7 @@ impl TabPage {
         }
         inner
             .preview
-            .show(self.cursor_item().as_ref(), self.side_options());
+            .show(self.cursor_item().as_ref(), self.listing_options());
     }
 
     /// The side columns list in the tab's order, hidden files included or
@@ -92,6 +93,14 @@ impl TabPage {
         let (sort, hidden) = (self.0.model.sort(), self.0.model.show_hidden());
         self.0.parent.set_view(sort.clone(), hidden);
         self.0.preview.folder().set_view(sort, hidden);
+    }
+
+    /// Brings the yank marks of all three columns in line with the yanked
+    /// set. Folders the tab keeps without showing them catch up when shown.
+    pub fn refresh_yank(&self) {
+        self.0.model.refresh_yank();
+        self.0.parent.refresh_yank();
+        self.0.preview.folder().refresh_yank();
     }
 
     /// `J` and `K`: scrolls the preview by `by` lines.

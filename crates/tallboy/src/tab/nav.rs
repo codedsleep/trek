@@ -7,9 +7,16 @@ use tallboy_core::location::Location;
 impl TabPage {
     /// Shows `location`, recording it in the history.
     pub fn navigate(&self, location: Location) {
+        self.navigate_to(location, Restore::default());
+    }
+
+    /// The same, saying where the cursor belongs once the folder is shown.
+    /// A folder the tab still has the listing of is shown at once, so this
+    /// has to be known before the load starts.
+    fn navigate_to(&self, location: Location, restore: Restore) {
         self.remember_view_state();
         self.0.history.borrow_mut().navigate(location.clone());
-        self.0.restore.replace(Restore::default());
+        self.0.restore.replace(restore);
         self.show(location);
     }
 
@@ -36,7 +43,8 @@ impl TabPage {
         }
     }
 
-    /// Loads the current folder again, keeping scroll position and selection.
+    /// Reads the current folder again from disk, keeping scroll position
+    /// and cursor. Folders kept from earlier are forgotten with it.
     pub fn reload(&self) {
         let cursor = self.cursor_uri();
         let scroll = self.scroll_adjustment().value();
@@ -44,7 +52,7 @@ impl TabPage {
             cursor,
             scroll: Some(scroll),
         });
-        self.start_load();
+        self.load(true);
     }
 
     /// Goes to the parent folder and selects the folder just left (§8.4).
@@ -56,11 +64,13 @@ impl TabPage {
         let Some(location) = location_from_uri(&parent.uri()) else {
             return;
         };
-        self.navigate(location);
-        self.0.restore.replace(Restore {
-            cursor: Some(current.uri().into()),
-            scroll: None,
-        });
+        self.navigate_to(
+            location,
+            Restore {
+                cursor: Some(current.uri().into()),
+                scroll: None,
+            },
+        );
     }
 
     /// Whether Parent Folder can do anything here.

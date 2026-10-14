@@ -149,6 +149,7 @@ impl MainWindow {
         };
         let selected = self.selected();
         if !of_folder && !selected.is_empty() {
+            crate::view::item::settle_types(&selected);
             let files = selected.iter().map(|item| item.meta().clone()).collect();
             crate::dialogs::properties::show(&app, &parent, files, renamed);
             return;

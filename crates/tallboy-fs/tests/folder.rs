@@ -1,6 +1,9 @@
 use gio::prelude::*;
-use std::{fs, path::PathBuf, time::Duration};
-use tallboy_fs::folder::{Folder, FolderEvent, Options, nearest_existing_ancestor};
+use std::{collections::HashMap, fs, path::PathBuf, time::Duration};
+use tallboy_fs::{
+    folder::{Folder, FolderEvent, Options, nearest_existing_ancestor},
+    meta::FileMeta,
+};
 fn temp() -> tempfile::TempDir {
     let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
     fs::create_dir_all(&root).unwrap();
@@ -72,9 +75,16 @@ fn load_5000_and_cancel_mid_load() {
     })
     .unwrap();
 }
+/// What the folder reported, apart from the types of files it listed by
+/// name and has read since.
+fn changes(folder: &Folder) -> Vec<FolderEvent> {
+    std::iter::from_fn(|| folder.events.try_recv().ok())
+        .filter(|event| !matches!(event, FolderEvent::Typed(_)))
+        .collect()
+}
 async fn one_event(folder: &Folder, expected: impl Fn(&FolderEvent) -> bool) {
     glib::timeout_future(Duration::from_millis(450)).await;
-    let events: Vec<_> = std::iter::from_fn(|| folder.events.try_recv().ok()).collect();
+    let events = changes(folder);
     assert_eq!(events.len(), 1, "{events:?}");
     assert!(expected(&events[0]), "{events:?}");
 }
@@ -149,7 +159,7 @@ fn a_change_to_the_watched_folder_itself_is_not_a_child_event() {
             finish(&f).await;
             fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
             glib::timeout_future(Duration::from_millis(450)).await;
-            let events: Vec<_> = std::iter::from_fn(|| f.events.try_recv().ok()).collect();
+            let events = changes(&f);
             assert!(events.is_empty(), "{events:?}");
             // A real child change still arrives afterwards.
             fs::write(path.join("child"), b"changed").unwrap();
@@ -158,6 +168,94 @@ fn a_change_to_the_watched_folder_itself_is_not_a_child_event() {
                 |e| matches!(e, FolderEvent::Changed(m) if m.display_name == "child"),
             )
             .await;
+        })
+    })
+    .unwrap();
+}
+
+/// Lists `path` and returns its files by name, with the types reported
+/// after the listing applied.
+async fn listed(path: &std::path::Path, options: Options) -> HashMap<String, FileMeta> {
+    let f = Folder::new(&gio::File::for_path(path), options, None).unwrap();
+    let mut seen = HashMap::new();
+    loop {
+        match f.events.recv().await.unwrap() {
+            FolderEvent::Batch(batch) => {
+                for m in batch {
+                    seen.insert(m.uri.clone(), m);
+                }
+            }
+            FolderEvent::Finished => break,
+            FolderEvent::Error(e) => panic!("{e}"),
+            _ => {}
+        }
+    }
+    // Types follow the listing; the worker is given time to read the files.
+    glib::timeout_future(Duration::from_millis(400)).await;
+    while let Ok(event) = f.events.try_recv() {
+        if let FolderEvent::Typed(typed) = event {
+            for (uri, facts) in typed {
+                let meta = seen.get_mut(&uri).expect("a typed file was listed");
+                meta.set_type(&facts);
+            }
+        }
+    }
+    seen.into_values()
+        .map(|m| (m.display_name.clone(), m))
+        .collect()
+}
+#[test]
+fn a_listing_goes_by_name_and_reads_only_what_the_name_leaves_open() {
+    let t = temp();
+    fs::write(t.path().join("notes.txt"), b"plain").unwrap();
+    fs::write(t.path().join("script"), b"#!/bin/sh\necho hello\n").unwrap();
+    fs::write(t.path().join("empty"), b"").unwrap();
+    fs::create_dir(t.path().join("dir")).unwrap();
+    let ctx = glib::MainContext::new();
+    ctx.with_thread_default(|| {
+        ctx.block_on(async {
+            // Tested afterwards: every type ends up what a full query gives.
+            let seen = listed(t.path(), Options::default()).await;
+            for (name, meta) in &seen {
+                let full =
+                    FileMeta::query(&gio::File::for_path(t.path().join(name)), true, false, None)
+                        .unwrap();
+                assert!(!meta.type_uncertain, "{name}");
+                assert_eq!(meta.content_type, full.content_type, "{name}");
+                assert_eq!(meta.description, full.description, "{name}");
+                // The icon is worked out from the type, not asked for.
+                assert_eq!(meta.icon, full.icon, "{name}");
+            }
+            assert_eq!(&*seen["script"].content_type, "application/x-shellscript");
+            // Deferred: nothing is read, and the file says so.
+            let deferred = Options {
+                defer_content_test: true,
+                ..Options::default()
+            };
+            let seen = listed(t.path(), deferred).await;
+            assert!(seen["script"].type_uncertain);
+            assert_ne!(&*seen["script"].content_type, "application/x-shellscript");
+            assert!(!seen["notes.txt"].type_uncertain);
+            assert!(!seen["empty"].type_uncertain);
+            assert!(!seen["dir"].type_uncertain);
+        })
+    })
+    .unwrap();
+}
+#[test]
+fn listed_user_folders_get_the_icons_gio_gives_them() {
+    // The home folder is listed from its parent, which only reads names.
+    let home = glib::home_dir();
+    let (Some(parent), Some(name)) = (home.parent(), home.file_name()) else {
+        return;
+    };
+    let name = name.to_string_lossy().into_owned();
+    let ctx = glib::MainContext::new();
+    ctx.with_thread_default(|| {
+        ctx.block_on(async {
+            let seen = listed(parent, Options::default()).await;
+            let full = FileMeta::query(&gio::File::for_path(&home), true, false, None).unwrap();
+            assert_eq!(seen[&name].icon, full.icon);
         })
     })
     .unwrap();

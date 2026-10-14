@@ -92,7 +92,7 @@ impl TabPage {
             (Some(at), count) if count > 0 => format!("{}/{count}", at + 1),
             _ => "0/0".to_owned(),
         };
-        let info = inner.fs_info.borrow();
+        let info = model.fs_info();
         let right = match (info.free, info.total) {
             (Some(free), Some(total)) => format::free_space(free, total, si),
             _ => String::new(),

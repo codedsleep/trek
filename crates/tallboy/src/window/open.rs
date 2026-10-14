@@ -20,6 +20,7 @@ impl MainWindow {
     pub(super) fn open_selection_with(&self) {
         let Some(tab) = self.active_tab() else { return };
         let selected = tab.targets();
+        crate::view::item::settle_types(&selected);
         let Some(first) = selected.iter().find(|item| !item.is_dir()) else {
             return;
         };

@@ -135,7 +135,7 @@ fn name_factory(
         content.append(&image);
         content.append(&label);
         dnd::attach(&content, cell, &selection, &image, style, &hooks);
-        super::lines::follow_item(cell, &content, None);
+        super::lines::follow_item(cell, &content, &image, None);
         cell.set_child(Some(&content));
     });
     factory.connect_unbind(move |_, object| {
@@ -187,6 +187,13 @@ fn text_factory(col: Col, style: Style) -> gtk::SignalListItemFactory {
             let label = gtk::Label::new(None);
             label.set_xalign(if col == Col::Size { 1.0 } else { 0.0 });
             label.set_ellipsize(pango::EllipsizeMode::End);
+            if col == Col::Desc {
+                // The one text that can change under a bound cell: a file
+                // listed by name is read afterwards.
+                cell.property_expression("item")
+                    .chain_property::<FileItem>("description")
+                    .bind(&label, "label", gtk::Widget::NONE);
+            }
             cell.set_child(Some(&label));
         }
     });

@@ -152,6 +152,7 @@ impl TreeNode {
                     FolderEvent::Started
                     | FolderEvent::Changed(_)
                     | FolderEvent::FsInfo(_)
+                    | FolderEvent::Typed(_)
                     | FolderEvent::RootGone => {}
                 }
             }

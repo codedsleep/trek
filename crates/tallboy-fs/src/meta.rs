@@ -2,13 +2,22 @@
 use gio::prelude::*;
 use std::{
     cmp::Ordering,
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     path::PathBuf,
     sync::{Arc, LazyLock, Mutex, PoisonError},
 };
 use tallboy_core::sort::{SortFacts, SortSpec};
+/// The attributes every file is asked for, written once. The icon is kept
+/// apart: asking GIO for `standard::icon` makes it read the start of every
+/// file whose name does not settle its type, whichever content-type
+/// attribute is asked for beside it.
+macro_rules! common_attributes {
+    () => {
+        "standard::name,standard::display-name,standard::edit-name,standard::type,standard::is-hidden,standard::is-backup,standard::is-symlink,standard::symlink-target,standard::size,standard::allocated-size,standard::target-uri,time::modified,time::access,time::created,unix::is-mountpoint,unix::mode,unix::uid,unix::gid,owner::user,owner::group,access::*,id::filesystem,trash::*"
+    };
+}
 /// Common metadata attributes; content testing is appended according to the preference.
-pub const ATTRIBUTES: &str = "standard::name,standard::display-name,standard::edit-name,standard::type,standard::is-hidden,standard::is-backup,standard::is-symlink,standard::symlink-target,standard::icon,standard::size,standard::allocated-size,standard::target-uri,time::modified,time::access,time::created,unix::is-mountpoint,unix::mode,unix::uid,unix::gid,owner::user,owner::group,access::*,id::filesystem,trash::*";
+pub const ATTRIBUTES: &str = concat!(common_attributes!(), ",standard::icon");
 /// Content-type query variant without duplicating the attribute list.
 pub fn attributes(defer_content_test: bool) -> String {
     format!(
@@ -19,6 +28,100 @@ pub fn attributes(defer_content_test: bool) -> String {
             "standard::content-type"
         }
     )
+}
+/// What a folder listing asks of each file: the type its name gives, and no
+/// file is opened. A local file's icon follows from its type, see
+/// [`type_facts`]; other backends know icons that no type gives (the trash
+/// can, a network share), so they are still asked.
+pub fn listing_attributes(native: bool) -> String {
+    format!(
+        "{},standard::fast-content-type",
+        if native {
+            common_attributes!()
+        } else {
+            ATTRIBUTES
+        }
+    )
+}
+/// What follows from a file's content type. Shared between files, see [`intern`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TypeFacts {
+    /// MIME type.
+    pub content_type: Arc<str>,
+    /// MIME description.
+    pub description: Arc<str>,
+    /// Serialized GIO icon of the type.
+    pub icon: Option<Arc<str>>,
+}
+const TYPE_LIMIT: usize = 1024;
+/// Description and icon of a content type, looked up once per type instead
+/// of once per file.
+pub fn type_facts(content_type: &str) -> TypeFacts {
+    static KNOWN: LazyLock<Mutex<HashMap<Arc<str>, TypeFacts>>> = LazyLock::new(Mutex::default);
+    let mut known = KNOWN.lock().unwrap_or_else(PoisonError::into_inner);
+    if let Some(facts) = known.get(content_type) {
+        return facts.clone();
+    }
+    if known.len() >= TYPE_LIMIT {
+        known.clear();
+    }
+    let shared = intern(content_type);
+    let facts = TypeFacts {
+        description: intern(&gio::content_type_get_description(content_type)),
+        icon: gio::content_type_get_icon(content_type)
+            .to_string()
+            .map(|icon| intern(&icon)),
+        content_type: shared.clone(),
+    };
+    known.insert(shared, facts.clone());
+    facts
+}
+/// The icons GIO gives the home folder and the XDG user folders in place of
+/// the plain folder icon, as its local backend does for `standard::icon`.
+fn special_folder_icon(path: &std::path::Path) -> Option<Arc<str>> {
+    static SPECIAL: LazyLock<Vec<(PathBuf, Option<Arc<str>>)>> = LazyLock::new(|| {
+        use glib::UserDirectory as Dir;
+        let plain = |name: &str| gio::ThemedIcon::new(name);
+        let with_fallbacks = |name: &str| gio::ThemedIcon::with_default_fallbacks(name);
+        let mut special = vec![(glib::home_dir(), plain("user-home"))];
+        for (directory, icon) in [
+            (Dir::Desktop, plain("user-desktop")),
+            (Dir::Documents, with_fallbacks("folder-documents")),
+            (Dir::Downloads, with_fallbacks("folder-download")),
+            (Dir::Music, with_fallbacks("folder-music")),
+            (Dir::Pictures, with_fallbacks("folder-pictures")),
+            (Dir::PublicShare, with_fallbacks("folder-publicshare")),
+            (Dir::Templates, with_fallbacks("folder-templates")),
+            (Dir::Videos, with_fallbacks("folder-videos")),
+        ] {
+            // An unset user folder is reported as the home folder, which
+            // comes first, as it does in GIO.
+            if let Some(path) = glib::user_special_dir(directory) {
+                special.push((path, icon));
+            }
+        }
+        special
+            .into_iter()
+            .map(|(path, icon)| (path, icon.to_string().map(|icon| intern(&icon))))
+            .collect()
+    });
+    SPECIAL
+        .iter()
+        .find(|(special, _)| special == path)
+        .and_then(|(_, icon)| icon.clone())
+}
+/// Reads the start of a file to find its type, as a listing without
+/// `defer_content_test` used to for every file. Blocking.
+pub fn sniff(file: &gio::File, cancel: Option<&gio::Cancellable>) -> Option<TypeFacts> {
+    let info = file
+        .query_info(
+            "standard::content-type",
+            gio::FileQueryInfoFlags::NONE,
+            cancel,
+        )
+        .ok()?;
+    info.attribute_string("standard::content-type")
+        .map(|content_type| type_facts(&content_type))
 }
 /// Access capabilities reported by GIO.
 #[derive(Debug, Clone, Copy, Default)]
@@ -115,6 +218,9 @@ pub struct FileMeta {
     pub symlink_target: Option<PathBuf>,
     /// MIME type. Shared between files, see [`intern`].
     pub content_type: Arc<str>,
+    /// The type is what the name suggests and the content has not been
+    /// read yet: a listing tests it afterwards, see `FolderEvent::Typed`.
+    pub type_uncertain: bool,
     /// MIME description. Shared between files, see [`intern`].
     pub description: Arc<str>,
     /// Serialized GIO icon. Shared between files, see [`intern`].
@@ -179,15 +285,42 @@ impl FileMeta {
         };
         let display_name =
             text("standard::display-name").unwrap_or_else(|| name.to_string_lossy().into_owned());
-        let content_type = info
-            .attribute_string("standard::content-type")
-            .or_else(|| info.attribute_string("standard::fast-content-type"))
-            .map_or_else(|| intern("application/octet-stream"), |s| intern(&s));
-        let description = intern(&gio::content_type_get_description(&content_type));
         let size = if info.has_attribute("standard::size") {
             info.size().max(0) as u64
         } else {
             0
+        };
+        let file_type = if info.has_attribute("standard::type") {
+            info.file_type()
+        } else {
+            gio::FileType::Unknown
+        };
+        let tested = info.attribute_string("standard::content-type");
+        // GIO reads a file only when its name leaves the type open, and
+        // never an empty one; the same rule says which files a listing by
+        // name still has to test.
+        let type_uncertain = tested.is_none()
+            && file_type == gio::FileType::Regular
+            && size > 0
+            && gio::content_type_guess(Some(&name), None).1;
+        let facts = tested
+            .or_else(|| info.attribute_string("standard::fast-content-type"))
+            .map_or_else(
+                || type_facts("application/octet-stream"),
+                |content_type| type_facts(&content_type),
+            );
+        let icon = if info.has_attribute("standard::icon") {
+            info.icon()
+                .and_then(|icon| icon.to_string())
+                .map(|icon| intern(&icon))
+        } else if file.is_native() {
+            // A listing does not ask for it, see `listing_attributes`.
+            file.path()
+                .filter(|_| file_type == gio::FileType::Directory)
+                .and_then(|path| special_folder_icon(&path))
+                .or_else(|| facts.icon.clone())
+        } else {
+            None
         };
         let mtime = info.attribute_uint64("time::modified") as i64;
         let mode = info.attribute_uint32("unix::mode");
@@ -197,11 +330,7 @@ impl FileMeta {
             name,
             edit_name: text("standard::edit-name").unwrap_or_else(|| display_name.clone()),
             uri: file.uri().to_string(),
-            file_type: if info.has_attribute("standard::type") {
-                info.file_type()
-            } else {
-                gio::FileType::Unknown
-            },
+            file_type,
             hidden: flag("standard::is-hidden")
                 || (backup_as_hidden && flag("standard::is-backup")),
             symlink: flag("standard::is-symlink"),
@@ -209,14 +338,10 @@ impl FileMeta {
                 .has_attribute("standard::symlink-target")
                 .then(|| info.symlink_target())
                 .flatten(),
-            content_type,
-            description,
-            icon: info
-                .has_attribute("standard::icon")
-                .then(|| info.icon())
-                .flatten()
-                .and_then(|i| i.to_string())
-                .map(|s| intern(&s)),
+            content_type: facts.content_type,
+            type_uncertain,
+            description: facts.description,
+            icon,
             size,
             allocated_size: info.attribute_uint64("standard::allocated-size"),
             mtime,
@@ -276,6 +401,18 @@ impl FileMeta {
     }
 }
 impl FileMeta {
+    /// Takes the type found by reading the file. Returns whether it differs
+    /// from the type the name suggested.
+    pub fn set_type(&mut self, facts: &TypeFacts) -> bool {
+        self.type_uncertain = false;
+        if self.content_type == facts.content_type {
+            return false;
+        }
+        self.content_type = facts.content_type.clone();
+        self.description = facts.description.clone();
+        self.icon = facts.icon.clone();
+        true
+    }
     /// The core comparator's inputs, borrowed from this value. A symbolic
     /// link to a folder sorts with the folders.
     pub fn sort_facts(&self) -> SortFacts<'_> {

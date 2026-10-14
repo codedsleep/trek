@@ -7,6 +7,7 @@ pub mod item;
 pub mod keys;
 pub mod lines;
 pub mod list;
+pub mod listing;
 pub mod mini;
 pub mod model;
 pub mod thumbs;

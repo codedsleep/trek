@@ -1,70 +1,112 @@
-//! Loading a folder and applying its event stream to the model.
+//! Showing a folder: taking its listing from where the tab already has it,
+//! or reading it, and following what the listing reports.
 
 use super::{Change, LoadState, Restore, TabPage, location_from_uri};
-use crate::{debug, dialogs};
+use crate::{
+    debug, dialogs,
+    view::listing::{Listing, Notice, Phase},
+};
 use gtk::{gio, glib, prelude::*};
 use std::time::Instant;
-use tallboy_fs::folder::{Folder, FolderEvent, FsInfo, Options, nearest_existing_ancestor};
+use tallboy_fs::folder::{Options, nearest_existing_ancestor};
 
 impl TabPage {
-    /// Drops the current folder and loads the tab's location from scratch.
+    /// Shows the tab's location: from the listing a side column or the
+    /// tab's cache holds, or else by reading the folder.
     pub(super) fn start_load(&self) {
+        self.load(false);
+    }
+
+    /// `afresh` reads the folder from disk whatever the tab has kept.
+    pub(super) fn load(&self, afresh: bool) {
         let inner = &self.0;
         let generation = inner.generation.get() + 1;
         inner.generation.set(generation);
-        // Clearing the model destroys the focused cell; remember that the
+        // Replacing the listing destroys the focused cell; remember that the
         // view had the keyboard so that the new items get it back.
         if self.has_focus() {
             inner.wants_focus.set(true);
         }
-        // Dropping the folder cancels its load and its monitor.
-        inner.folder.replace(None);
-        inner.model.clear();
-        inner.fs_info.replace(FsInfo::default());
+        self.lift_cursor();
         // A load that restores a scroll position must not be pulled to the start.
         inner.pin_start.set(inner.restore.borrow().scroll.is_none());
         inner.load_started.set(Some(Instant::now()));
+        inner.first_batch.set(true);
         if debug::tracing() {
             inner.stalls.replace(Some(debug::StallWatch::start()));
         }
-        self.set_load(LoadState::Loading);
 
-        let settings = inner.app.settings();
-        let file = gio::File::for_uri(inner.location.borrow().to_uri());
+        let uri = inner.location.borrow().to_uri().to_owned();
+        let file = gio::File::for_uri(&uri);
         inner.awaited.replace(None);
         inner.writable.set(true);
         inner.filesystem.replace(None);
         self.query_folder_facts(&file, generation);
-        let options = Options {
-            backup_as_hidden: settings.backup_as_hidden(),
-            defer_content_test: settings.defer_content_test(),
-            ..Options::default()
+        let options = self.listing_options();
+        let kept = if afresh {
+            inner.cache.clear();
+            None
+        } else {
+            self.claim(&uri, options)
         };
-        let parent = inner.root.root().and_downcast::<gtk::Window>();
-        let mount = gtk::MountOperation::new(parent.as_ref());
-        let folder = match Folder::new(&file, options, Some(mount.upcast())) {
-            Ok(folder) => folder,
-            Err(e) => {
-                self.set_load(LoadState::Failed(dialogs::error::folder(&e)));
-                return;
+        let listing = match kept {
+            Some(listing) => Ok(listing),
+            None => {
+                let parent = inner.root.root().and_downcast::<gtk::Window>();
+                let mount = gtk::MountOperation::new(parent.as_ref());
+                Listing::load(&file, options, Some(mount.upcast()), &inner.model.shown())
             }
         };
-        let events = folder.events.clone();
-        let weak = self.downgrade();
-        glib::spawn_future_local(async move {
-            let mut first_batch = true;
-            while let Ok(event) = events.recv().await {
-                let Some(tab) = weak.upgrade() else { break };
-                if tab.0.generation.get() != generation {
-                    break;
+        // The folder shown until now goes to the cache, where the side
+        // columns find it: left behind, it is the next preview or parent.
+        let keep = |old: Listing| {
+            if afresh {
+                old.discard();
+            } else {
+                inner.cache.put(old);
+            }
+        };
+        match listing {
+            Ok(listing) => {
+                let loaded = listing.is_loaded();
+                keep(inner.model.adopt(listing));
+                inner
+                    .watching
+                    .replace(Some(debug::Counted::new((), &debug::LIVE_FOLDERS)));
+                if loaded {
+                    self.focus_if_wanted();
+                    self.finish_load();
+                } else {
+                    self.set_load(LoadState::Loading);
+                    if inner.model.visible_count() > 0 {
+                        self.focus_if_wanted();
+                    }
                 }
-                tab.apply(event, &mut first_batch);
             }
-        });
-        inner.folder.replace(Some(crate::debug::Counted::new(
-            folder,
-            &crate::debug::LIVE_FOLDERS,
-        )));
+            Err(e) => {
+                keep(inner.model.clear());
+                inner.watching.replace(None);
+                self.set_load(LoadState::Failed(dialogs::error::folder(&e)));
+            }
+        }
+    }
+
+    /// The listing of `uri` this tab already has: shown by one of its side
+    /// columns, which gives it up, or kept from an earlier visit.
+    fn claim(&self, uri: &str, options: Options) -> Option<Listing> {
+        let inner = &self.0;
+        let shown = inner
+            .parent
+            .yield_listing(uri)
+            .or_else(|| inner.preview.yield_listing(uri));
+        match shown {
+            Some(listing) if listing.reusable() && listing.options() == options => Some(listing),
+            Some(listing) => {
+                listing.discard();
+                None
+            }
+            None => inner.cache.take(uri, options),
+        }
     }
 
     fn set_load(&self, state: LoadState) {
@@ -73,14 +115,22 @@ impl TabPage {
         self.emit(Change::Load);
     }
 
-    fn apply(&self, event: FolderEvent, first_batch: &mut bool) {
-        let model = &self.0.model;
-        match event {
-            FolderEvent::Started => {}
-            FolderEvent::Batch(batch) => {
-                model.append_batch(batch);
+    /// The folder has been read in full, now or when a column read it earlier.
+    fn finish_load(&self) {
+        self.set_load(LoadState::Loaded);
+        self.release_pin_when_sorted();
+        self.restore_view_state();
+        if debug::tracing() {
+            self.trace_when_sorted();
+        }
+    }
+
+    /// What the listing shown reports, after it has changed its items.
+    pub(super) fn heard(&self, notice: Notice<'_>) {
+        match notice {
+            Notice::Batch => {
                 self.focus_if_wanted();
-                if std::mem::take(first_batch) && debug::tracing() {
+                if self.0.first_batch.replace(false) && debug::tracing() {
                     self.trace_since_load("first batch in the model");
                     let started = self.0.load_started.get();
                     debug::after_next_paint(&self.0.root, move || {
@@ -90,40 +140,20 @@ impl TabPage {
                     });
                 }
             }
-            FolderEvent::Finished => {
-                self.set_load(LoadState::Loaded);
-                self.release_pin_when_sorted();
-                self.restore_view_state();
-                if debug::tracing() {
-                    self.trace_when_sorted();
-                }
-            }
-            FolderEvent::Error(e) => {
-                let message = dialogs::error::folder(&e);
-                if *self.0.load.borrow() == LoadState::Loading && model.total_count() == 0 {
+            Notice::Finished => self.finish_load(),
+            Notice::Error(e) => {
+                let message = dialogs::error::folder(e);
+                if self.0.model.phase() == Phase::Failed {
                     self.set_load(LoadState::Failed(message));
                 } else {
                     log::warn!("Folder {}: {message}", self.0.location.borrow().to_uri());
                 }
             }
-            FolderEvent::Added(meta) | FolderEvent::Changed(meta) => {
-                let uri = meta.uri.clone();
-                model.upsert(meta);
-                self.select_if_awaited(&uri);
-            }
-            FolderEvent::Removed(uri) => {
-                model.remove(&uri);
-            }
-            FolderEvent::Renamed { from, to } => {
-                let uri = to.uri.clone();
-                model.rename(&from, to);
-                self.select_if_awaited(&uri);
-            }
-            FolderEvent::FsInfo(info) => {
-                self.0.fs_info.replace(info);
-                self.emit(Change::Status);
-            }
-            FolderEvent::RootGone => self.leave_gone_folder(),
+            Notice::Listed(uri) => self.select_if_awaited(uri),
+            // The status line names the type of the file under the cursor.
+            Notice::FsInfo | Notice::Typed => self.emit(Change::Status),
+            Notice::RootGone => self.leave_gone_folder(),
+            Notice::Replacing(_) => {}
         }
     }
 
@@ -216,8 +246,13 @@ impl TabPage {
         }
     }
 
-    /// The pin lasts until the incremental sort has placed every item.
+    /// The pin lasts until the incremental sort has placed every item. A
+    /// listing that came sorted is settled here and now, before the frame.
     fn release_pin_when_sorted(&self) {
+        if self.0.model.sorted().pending() == 0 {
+            self.release_pin();
+            return;
+        }
         let weak = self.downgrade();
         let generation = self.0.generation.get();
         glib::idle_add_local(move || {
@@ -230,23 +265,27 @@ impl TabPage {
             if tab.0.model.sorted().pending() > 0 {
                 return glib::ControlFlow::Continue;
             }
-            // A file that was to be selected once listed ("Show in folder")
-            // arrived with the listing itself, not as a later change.
-            let awaited = tab.0.awaited.borrow().clone();
-            if let Some(uri) = awaited
-                && tab.hover_uri(&uri)
-            {
-                tab.0.awaited.replace(None);
-                return glib::ControlFlow::Break;
-            }
-            // The keyboard focus was given to whichever item came first
-            // while loading; now that the order is final, put it on the
-            // real first item, or a later relayout scrolls to the old one.
-            if tab.0.pin_start.replace(false) && tab.0.model.visible_count() > 0 {
-                tab.place_cursor(0, true);
-            }
+            tab.release_pin();
             glib::ControlFlow::Break
         });
+    }
+
+    fn release_pin(&self) {
+        // A file that was to be selected once listed ("Show in folder")
+        // arrived with the listing itself, not as a later change.
+        let awaited = self.0.awaited.borrow().clone();
+        if let Some(uri) = awaited
+            && self.hover_uri(&uri)
+        {
+            self.0.awaited.replace(None);
+            return;
+        }
+        // The keyboard focus was given to whichever item came first
+        // while loading; now that the order is final, put it on the
+        // real first item, or a later relayout scrolls to the old one.
+        if self.0.pin_start.replace(false) && self.0.model.visible_count() > 0 {
+            self.place_cursor(0, true);
+        }
     }
 
     fn restore_view_state(&self) {

@@ -15,9 +15,13 @@ static START: OnceLock<Instant> = OnceLock::new();
 /// Number of live tab pages; must return to zero when every window is closed.
 pub static LIVE_TABS: AtomicI64 = AtomicI64::new(0);
 
-/// Number of folders being listed and watched, by tabs and by the directory
-/// tree; must return to zero with the tabs.
+/// Number of folders shown in the files column of a tab or watched by the
+/// directory tree; must return to zero with the tabs.
 pub static LIVE_FOLDERS: AtomicI64 = AtomicI64::new(0);
+
+/// Number of folder listings alive: the ones columns show and the ones
+/// their tabs keep for going back to; must return to zero with the tabs.
+pub static LIVE_LISTINGS: AtomicI64 = AtomicI64::new(0);
 
 /// A value counted in one of the leak counters for as long as it lives.
 pub struct Counted<T> {
@@ -46,12 +50,13 @@ impl<T> Drop for Counted<T> {
     }
 }
 
-/// Both counters, as the state line and `TALLBOY_TRACE` print them.
+/// The counters, as the state line and `TALLBOY_TRACE` print them.
 pub fn live() -> String {
     format!(
-        "live_tabs={} live_folders={}",
+        "live_tabs={} live_folders={} live_listings={}",
         LIVE_TABS.load(Ordering::Relaxed),
-        LIVE_FOLDERS.load(Ordering::Relaxed)
+        LIVE_FOLDERS.load(Ordering::Relaxed),
+        LIVE_LISTINGS.load(Ordering::Relaxed)
     )
 }
 

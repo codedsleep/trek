@@ -4,8 +4,9 @@ use gtk::{gio, glib, prelude::*, subclass::prelude::*};
 use std::{
     cell::{Cell, Ref, RefCell},
     collections::{HashMap, HashSet, VecDeque},
+    marker::PhantomData,
 };
-use tallboy_fs::meta::FileMeta;
+use tallboy_fs::meta::{self, FileMeta, TypeFacts};
 
 mod imp {
     use super::*;
@@ -21,6 +22,24 @@ mod imp {
         /// 0, or [`YANK_COPY`] or [`YANK_CUT`] while the file is yanked.
         #[property(get, set, explicit_notify)]
         pub yank: Cell<u8>,
+        /// The icon of the file's type. A folder is listed by name and the
+        /// files a name does not settle are read afterwards, so a cell
+        /// follows this instead of taking the icon once.
+        #[property(get = Self::type_icon)]
+        pub gicon: PhantomData<gio::Icon>,
+        /// What the file's type is called; it changes with `gicon`.
+        #[property(get = Self::type_description)]
+        pub description: PhantomData<String>,
+    }
+
+    impl FileItem {
+        fn type_icon(&self) -> gio::Icon {
+            self.obj().icon()
+        }
+
+        fn type_description(&self) -> String {
+            self.obj().meta().description.to_string()
+        }
     }
 
     #[glib::object_subclass]
@@ -49,11 +68,20 @@ thread_local! {
     /// What `y` or `x` last put on the clipboard, until it is pasted as a
     /// move, unyanked, or replaced by another program's clipboard.
     static YANKED: RefCell<Option<Yanked>> = const { RefCell::new(None) };
+    /// Counts the changes of `YANKED`, so that a listing nobody was showing
+    /// can tell whether its marks are out of date.
+    static YANK_CHANGES: Cell<u64> = const { Cell::new(0) };
 }
 
 /// Replaces the yanked set. Listed items are told by their tab.
 pub fn set_yanked(yanked: Option<Yanked>) {
     YANKED.set(yanked);
+    YANK_CHANGES.set(YANK_CHANGES.get() + 1);
+}
+
+/// How often the yanked set has been replaced.
+pub fn yank_changes() -> u64 {
+    YANK_CHANGES.get()
 }
 
 /// How many files are yanked, and whether they were cut.
@@ -72,6 +100,18 @@ fn yank_state(uri: &str) -> u8 {
         }
         _ => 0,
     })
+}
+
+/// Files read at most when the type of each of several is needed at once.
+const SETTLED_AT_ONCE: usize = 2000;
+
+/// `FileItem::settle_type` for files a command is about to act on by type.
+/// A huge selection is not read through on the main loop; past the limit
+/// files keep the type their names suggest.
+pub fn settle_types(items: &[FileItem]) {
+    for item in items.iter().take(SETTLED_AT_ONCE) {
+        item.settle_type();
+    }
 }
 
 glib::wrapper! {
@@ -148,6 +188,42 @@ impl FileItem {
     /// Replaces the metadata after a monitor change.
     pub fn set_meta(&self, meta: FileMeta) {
         self.imp().meta.replace(Some(meta));
+    }
+
+    /// Takes the type found by reading the file. Returns whether it
+    /// differs from the one the name suggested; cells showing the item
+    /// follow.
+    pub fn set_type(&self, facts: &TypeFacts) -> bool {
+        let changed = self
+            .imp()
+            .meta
+            .borrow_mut()
+            .as_mut()
+            .is_some_and(|meta| meta.set_type(facts));
+        if changed {
+            self.notify_gicon();
+            self.notify_description();
+        }
+        changed
+    }
+
+    /// Makes sure the type is the file's own before something is decided by
+    /// it: a file listed by name that has not been read yet is read now.
+    /// Only local files, where that is one short read.
+    pub fn settle_type(&self) {
+        let uri = {
+            let meta = self.meta();
+            if !meta.type_uncertain {
+                return;
+            }
+            meta.uri.clone()
+        };
+        let file = gio::File::for_uri(&uri);
+        if file.is_native()
+            && let Some(facts) = meta::sniff(&file, gio::Cancellable::NONE)
+        {
+            self.set_type(&facts);
+        }
     }
 
     /// Whether activating the item enters it. A symbolic link to a folder

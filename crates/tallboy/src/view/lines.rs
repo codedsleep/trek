@@ -15,30 +15,51 @@ use tallboy_core::{format, keymap::Linemode};
 /// The widget name a row's content takes while the cursor is on it.
 pub const CURSOR: &str = "cursor";
 
-/// Makes `content` and `gutter` follow the item bound to `list_item`.
-/// Shared with the grid views, which have no gutter.
+/// Makes `image` follow the icon of the type of the item bound to
+/// `list_item`, which changes when a file listed by name is read. `bind`
+/// runs after this has set the icon and may put a thumbnail in its place.
+fn follow_type(list_item: &impl IsA<glib::Object>, image: &gtk::Image) {
+    list_item
+        .property_expression("item")
+        .chain_property::<FileItem>("gicon")
+        .bind(image, "gicon", gtk::Widget::NONE);
+}
+
+/// Makes `gutter` show the yank mark of the item bound to `list_item`.
+fn follow_yank(list_item: &impl IsA<glib::Object>, gutter: &gtk::Widget) {
+    list_item
+        .property_expression("item")
+        .chain_property::<FileItem>("yank")
+        .chain_closure::<String>(glib::closure!(|_: Option<glib::Object>, yank: u8| {
+            match yank {
+                item::YANK_COPY => "yank-copy",
+                item::YANK_CUT => "yank-cut",
+                _ => "",
+            }
+            .to_owned()
+        }))
+        .bind(gutter, "name", gtk::Widget::NONE);
+}
+
+/// Makes `content`, `image` and `gutter` follow the item bound to
+/// `list_item`: the cursor, the type's icon and the yank mark. Shared with
+/// the grid views, which have no gutter.
 pub(super) fn follow_item(
     list_item: &impl IsA<glib::Object>,
     content: &gtk::Box,
+    image: &gtk::Image,
     gutter: Option<&gtk::Widget>,
 ) {
-    let item = list_item.property_expression("item");
-    item.chain_property::<FileItem>("hovered")
+    follow_type(list_item, image);
+    list_item
+        .property_expression("item")
+        .chain_property::<FileItem>("hovered")
         .chain_closure::<String>(glib::closure!(|_: Option<glib::Object>, hovered: bool| {
             if hovered { CURSOR } else { "" }.to_owned()
         }))
         .bind(content, "name", gtk::Widget::NONE);
     if let Some(gutter) = gutter {
-        item.chain_property::<FileItem>("yank")
-            .chain_closure::<String>(glib::closure!(|_: Option<glib::Object>, yank: u8| {
-                match yank {
-                    item::YANK_COPY => "yank-copy",
-                    item::YANK_CUT => "yank-cut",
-                    _ => "",
-                }
-                .to_owned()
-            }))
-            .bind(gutter, "name", gtk::Widget::NONE);
+        follow_yank(list_item, gutter);
     }
 }
 
@@ -72,7 +93,10 @@ struct Row {
     image: gtk::Image,
 }
 
-fn setup(list_item: &gtk::ListItem, style: Style) -> Row {
+/// `cursor` is whether the row shows the cursor when it is on its item.
+/// The preview column's rows do not: for a moment after a folder is entered
+/// it still shows the listing the files column has taken over.
+fn setup(list_item: &gtk::ListItem, style: Style, cursor: bool) -> Row {
     let gutter = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     gutter.add_css_class("line-gutter");
     let image = grid::icon_image(style);
@@ -100,7 +124,12 @@ fn setup(list_item: &gtk::ListItem, style: Style) -> Row {
     ] {
         content.append(child);
     }
-    follow_item(list_item, &content, Some(gutter.upcast_ref()));
+    if cursor {
+        follow_item(list_item, &content, &image, Some(gutter.upcast_ref()));
+    } else {
+        follow_type(list_item, &image);
+        follow_yank(list_item, gutter.upcast_ref());
+    }
     list_item.set_child(Some(&content));
     Row { content, image }
 }
@@ -165,7 +194,7 @@ pub fn build(
         if let (Some(list_item), Some(selection)) =
             (object.downcast_ref::<gtk::ListItem>(), selection.upgrade())
         {
-            let row = setup(list_item, style);
+            let row = setup(list_item, style, true);
             dnd::attach(
                 &row.content,
                 list_item,
@@ -196,12 +225,12 @@ pub fn build(
 }
 
 /// Builds a column that only shows a folder: no selection, no gestures.
-/// A click activates the row.
-pub fn build_plain(model: &FolderModel, style: Style) -> gtk::ListView {
+/// A click activates the row. `cursor` as for `setup`.
+pub fn build_plain(model: &FolderModel, style: Style, cursor: bool) -> gtk::ListView {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(move |_, object| {
         if let Some(list_item) = object.downcast_ref::<gtk::ListItem>() {
-            setup(list_item, style);
+            setup(list_item, style, cursor);
         }
     });
     factory.connect_bind(move |_, object| {
@@ -209,7 +238,9 @@ pub fn build_plain(model: &FolderModel, style: Style) -> gtk::ListView {
             bind(list_item, style, Linemode::None, None);
         }
     });
-    let shown = gtk::NoSelection::new(Some(model.sorted().clone()));
+    // Over the column's selection model, not the folder's own list: that
+    // one is replaced whenever the column shows another folder.
+    let shown = gtk::NoSelection::new(Some(model.selection().clone()));
     let view = gtk::ListView::new(Some(shown), Some(factory));
     view.set_single_click_activate(true);
     view.set_can_focus(false);

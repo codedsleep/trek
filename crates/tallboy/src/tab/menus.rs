@@ -122,6 +122,8 @@ impl TabPage {
         } else {
             self.0.model.selected()
         };
+        // "Open With" lists the applications for the file's type.
+        crate::view::item::settle_types(&selected);
         let menu = if selected.is_empty() {
             folder_menu()
         } else {

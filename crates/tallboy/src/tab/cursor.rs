@@ -93,6 +93,15 @@ impl TabPage {
         }
     }
 
+    /// Takes the cursor off its file before the tab stops showing the
+    /// folder: the highlight is the tab's, and the listing may be shown by
+    /// another column next.
+    pub(super) fn lift_cursor(&self) {
+        if let Some(item) = self.0.cursor.item.take() {
+            item.hover(false);
+        }
+    }
+
     /// Puts the cursor on a position without the side effects of a movement
     /// the user asked for. `scroll` brings it into view.
     pub(super) fn place_cursor(&self, position: u32, scroll: bool) {

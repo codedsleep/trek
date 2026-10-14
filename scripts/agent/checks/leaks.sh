@@ -1,5 +1,6 @@
 # Leak counters (SCOPE 9.4). Tabs, panes, the directory tree and windows are
-# opened and closed; live tab pages and watched folders must return to zero.
+# opened and closed; live tab pages, watched folders and the folder listings
+# tabs keep for going back to must return to zero.
 # Run with:
 #   scripts/agent-run.sh --env TALLBOY_TRACE=1 -- --daemon-mode ~/.cache/tallboy-fixture/deep < scripts/agent/checks/leaks.sh
 live() { state | grep -o 'live_tabs=[0-9-]* live_folders=[0-9-]*'; }
@@ -16,6 +17,7 @@ echo "--- navigation replaces the folder"
 act go-to "'$HOME/.cache/tallboy-fixture/names'"; settle 0.8
 act go-to "'$HOME/.cache/tallboy-fixture/deep'"; settle 0.8
 check "still one folder after going somewhere and back" has "$(live)" 'live_tabs=1 live_folders=1'
+check "and the folder left behind is kept for going back to" has "$(state)" 'live_listings=[2-9]'
 
 echo "--- dual pane"
 vin key F3; settle 0.8
@@ -40,3 +42,4 @@ vin key ctrl+q; settle 0.8
 WIN=1; vin key ctrl+q; settle 1.5
 check "the process is still running (daemon mode)" test -n "$(pgrep -f 'tallboy --profile agent --daemon-mode')"
 check "nothing is alive after the last window closed" has "$(grep 'after a window closed' "$OUT/tallboy.log" | tail -1)" 'live_tabs=0 live_folders=0'
+check "nor is any listing a tab had kept" has "$(grep 'after a window closed' "$OUT/tallboy.log" | tail -1)" 'live_listings=0$'

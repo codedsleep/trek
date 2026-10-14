@@ -1,9 +1,12 @@
-//! Cancellable async folder enumeration and coalesced monitoring.
+//! Cancellable folder enumeration on a worker thread and coalesced monitoring.
 mod load;
 mod monitor;
-use crate::meta::FileMeta;
+use crate::meta::{FileMeta, TypeFacts};
 use gio::prelude::*;
-use std::rc::Rc;
+use std::{
+    rc::Rc,
+    sync::{Arc, OnceLock},
+};
 /// A folder-loading error, ready for the application's error mapper.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum FolderError {
@@ -52,15 +55,20 @@ pub enum FolderEvent {
     },
     /// Capacity information.
     FsInfo(FsInfo),
+    /// Files listed by name whose content has now been read, by URI. Sent
+    /// after `Finished`, also for a file whose type stayed the same.
+    Typed(Vec<(String, TypeFacts)>),
     /// Folder disappeared or was unmounted.
     RootGone,
 }
 /// Listing preferences captured for one load.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Options {
     /// Treat backup names as hidden.
     pub backup_as_hidden: bool,
-    /// Request cheap content type.
+    /// Every listing goes by name first. Without this the files a name
+    /// does not settle are read once the listing is complete and reported
+    /// as `FolderEvent::Typed`; with it nothing is read until a file is used.
     pub defer_content_test: bool,
     /// Number of entries per batch (clamped to 1–1000).
     pub batch_size: i32,
@@ -79,7 +87,9 @@ struct Inner {
     options: Options,
     cancel: gio::Cancellable,
     tx: async_channel::Sender<FolderEvent>,
-    filesystem: std::cell::RefCell<Option<String>>,
+    /// The folder's filesystem type, set by the listing and read by the
+    /// monitor for files that appear later.
+    filesystem: Arc<OnceLock<Option<String>>>,
 }
 impl Inner {
     fn send(&self, event: FolderEvent) {
@@ -88,8 +98,8 @@ impl Inner {
         }
     }
 }
-/// A per-tab folder. Construct on an acquired GLib main context; drop cancels
-/// load and monitor, without holding references to the tab or any GTK widget.
+/// A listed and watched folder. Construct on an acquired GLib main context;
+/// drop cancels load and monitor, without holding references to any GTK widget.
 pub struct Folder {
     inner: Rc<Inner>,
     monitor: Option<gio::FileMonitor>,
@@ -137,6 +147,11 @@ impl Folder {
         }
         self.events.close();
         while self.events.try_recv().is_ok() {}
+    }
+    /// Whether changes in the folder are reported. Without a monitor the
+    /// listing is only as fresh as its load.
+    pub fn is_watched(&self) -> bool {
+        self.monitor.is_some()
     }
     /// The underlying folder URI.
     pub fn uri(&self) -> String {

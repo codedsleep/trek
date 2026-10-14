@@ -105,7 +105,7 @@ pub(super) fn start(inner: &Rc<Inner>) -> Option<gio::FileMonitor> {
                                             .await
                                         {
                                             Ok(info) => {
-                                                let fs = inner.filesystem.borrow().clone();
+                                                let fs = inner.filesystem.get().cloned().flatten();
                                                 let meta = FileMeta::from_info(
                                                     file,
                                                     &info,

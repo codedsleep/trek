@@ -13,7 +13,7 @@ use crate::{
     app::App,
     debug,
     settings::HandlerId,
-    view::{FileItem, FolderModel, View},
+    view::{FileItem, FolderModel, View, listing::ListingCache},
 };
 use gtk::prelude::*;
 use std::{
@@ -27,7 +27,6 @@ use tallboy_core::{
     history::History,
     location::Location,
 };
-use tallboy_fs::folder::{Folder, FsInfo};
 
 pub use cursor::Mode;
 pub use status::Status;
@@ -92,10 +91,15 @@ struct Inner {
     preserve: Cell<bool>,
     location: RefCell<Location>,
     history: RefCell<History>,
-    folder: RefCell<Option<debug::Counted<Folder>>>,
+    /// Folders this tab has shown and may show again without reading them:
+    /// its three columns pass their listings to each other through it.
+    cache: Rc<ListingCache>,
+    /// Counted while the files column shows a folder.
+    watching: RefCell<Option<debug::Counted<()>>>,
     generation: Cell<u64>,
     load: RefCell<LoadState>,
-    fs_info: RefCell<FsInfo>,
+    /// The first files of this load have yet to arrive.
+    first_batch: Cell<bool>,
     restore: RefCell<Restore>,
     /// A file expected to appear soon (just created or renamed): select it.
     awaited: RefCell<Option<String>>,
@@ -192,11 +196,22 @@ impl TabPage {
             hover_delay_ms: 0,
             si_unit: settings.si_unit(),
         };
-        let parent =
-            crate::view::mini::MiniColumn::new(side_style, settings.sort(), settings.show_hidden());
+        let cache = Rc::new(ListingCache::default());
+        let parent = crate::view::mini::MiniColumn::new(
+            side_style,
+            settings.sort(),
+            settings.show_hidden(),
+            cache.clone(),
+            true,
+        );
         parent.widget().add_css_class("miller-parent");
         parent.widget().set_visible(false);
-        let preview = preview::Preview::new(side_style, settings.sort(), settings.show_hidden());
+        let preview = preview::Preview::new(
+            side_style,
+            settings.sort(),
+            settings.show_hidden(),
+            cache.clone(),
+        );
         preview.widget().add_css_class("miller-preview");
         preview.widget().set_visible(false);
         let page = gtk::Grid::new();
@@ -224,10 +239,11 @@ impl TabPage {
             preserve: Cell::new(false),
             location: RefCell::new(location.clone()),
             history: RefCell::default(),
-            folder: RefCell::default(),
+            cache,
+            watching: RefCell::default(),
             generation: Cell::new(0),
             load: RefCell::new(LoadState::Loading),
-            fs_info: RefCell::default(),
+            first_batch: Cell::new(true),
             restore: RefCell::default(),
             awaited: RefCell::default(),
             writable: Cell::new(true),
@@ -268,6 +284,12 @@ impl TabPage {
                 tab.sync_cursor_later();
                 tab.update_placeholders();
                 tab.emit(Change::Status);
+            }
+        });
+        let weak = tab.downgrade();
+        tab.0.model.connect_notice(move |notice| {
+            if let Some(tab) = weak.upgrade() {
+                tab.heard(notice);
             }
         });
         tab.watch_user_input();
@@ -468,6 +490,8 @@ impl TabPage {
 
     /// Hands items to the window to be opened.
     pub fn open(&self, items: Vec<FileItem>) {
+        // What opens a file is chosen by its type.
+        crate::view::item::settle_types(&items);
         let opener = self.0.opener.borrow().clone();
         if let Some(opener) = opener
             && !items.is_empty()

@@ -1,283 +1,263 @@
-//! The model stack shared by every view mode (PROMPT §7.3):
-//! list store → filter → sort → multi-selection.
+//! What a column shows (PROMPT §7.3): the listing of one folder under the
+//! column's own selection.
+//!
+//! The list store, filter and sort order belong to the `Listing`, which can
+//! move to another column; the selection model stays with the column, and
+//! with it the view built on top. Showing another folder swaps the listing
+//! underneath.
 
-use super::{FileItem, index::UriIndex};
-use gtk::{gio, glib, prelude::*};
+use super::{
+    FileItem,
+    listing::{Handler, Listing, Notice, Phase, Shown},
+};
+use gtk::{gio, prelude::*};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
 };
-use tallboy_core::{glob, keymap, sort::SortSpec};
-use tallboy_fs::meta::{self, FileMeta};
+use tallboy_core::sort::SortSpec;
+use tallboy_fs::folder::FsInfo;
 
-struct State {
-    show_hidden: Cell<bool>,
-    glob: RefCell<Option<String>>,
-    /// The `f` filter: a smart-case substring every item must contain.
-    needle: RefCell<Option<String>>,
-    sort: RefCell<SortSpec>,
-}
+/// About how many rows a GTK list keeps alive around what is visible.
+const ROWS_KEPT: u32 = 200;
+/// When a list model is replaced, GTK looks every new item up among the
+/// rows of the old one, to keep the widgets of items that stay. That is a
+/// call into the model per new item, about a two-hundred-and-fortieth of
+/// what a row costs to build: past this many new items per row that could
+/// be kept, dropping the old rows first is the cheaper way round.
+const ITEMS_PER_ROW_WORTH_KEEPING: u32 = 240;
 
-/// One folder's items with the tab's filter, sort order and selection.
-pub struct FolderModel {
-    store: gio::ListStore,
-    filter: gtk::CustomFilter,
-    sorter: gtk::CustomSorter,
-    sorted: gtk::SortListModel,
+struct Hub {
     selection: gtk::MultiSelection,
-    state: Rc<State>,
-    by_uri: RefCell<UriIndex>,
-    hidden: Cell<usize>,
+    listing: RefCell<Listing>,
+    shown: RefCell<Shown>,
+    /// The column's own interest in what its listing reports.
+    watcher: RefCell<Option<Handler>>,
+    /// An item being announced again was selected; select it again.
+    reselect: Cell<bool>,
+    /// The listing shown has been handed to another column, see `lend`.
+    lent: Cell<bool>,
 }
 
-fn file_item(object: &glib::Object) -> Option<&FileItem> {
-    object.downcast_ref::<FileItem>()
+/// One column's items with its filter, sort order and selection.
+pub struct FolderModel(Rc<Hub>);
+
+impl Hub {
+    fn position_of_item(&self, item: &FileItem) -> Option<u32> {
+        (0..self.selection.n_items())
+            .find(|position| self.selection.item(*position).as_ref() == Some(item.upcast_ref()))
+    }
+
+    fn position_of(&self, uri: &str) -> Option<u32> {
+        let item = self.listing.borrow().by_uri(uri)?;
+        self.position_of_item(&item)
+    }
+
+    fn heard(&self, notice: Notice<'_>) {
+        match &notice {
+            Notice::Replacing(item) => {
+                let selected = self
+                    .position_of_item(item)
+                    .is_some_and(|position| self.selection.is_selected(position));
+                self.reselect.set(self.reselect.get() || selected);
+            }
+            Notice::Listed(uri) => {
+                if self.reselect.replace(false)
+                    && let Some(position) = self.position_of(uri)
+                {
+                    self.selection.select_item(position, false);
+                }
+            }
+            _ => {}
+        }
+        let watcher = self.watcher.borrow().clone();
+        if let Some(watcher) = watcher {
+            watcher(notice);
+        }
+    }
 }
 
 impl FolderModel {
-    /// Creates an empty model.
+    /// Creates a model that shows no folder.
     pub fn new(sort: SortSpec, show_hidden: bool) -> Self {
-        let state = Rc::new(State {
-            show_hidden: Cell::new(show_hidden),
-            glob: RefCell::new(None),
-            needle: RefCell::new(None),
-            sort: RefCell::new(sort),
-        });
-        let store = gio::ListStore::new::<FileItem>();
-        let filter = gtk::CustomFilter::new({
-            let state = state.clone();
-            move |object| {
-                let Some(item) = file_item(object) else {
-                    return false;
-                };
-                let meta = item.meta();
-                if meta.hidden && !state.show_hidden.get() {
-                    return false;
-                }
-                if let Some(needle) = state.needle.borrow().as_deref()
-                    && !keymap::smart_matches(&meta.display_name, needle)
-                {
-                    return false;
-                }
-                match state.glob.borrow().as_deref() {
-                    // Folders always pass the name filter (§8.7).
-                    Some(pattern) if meta.file_type != gio::FileType::Directory => {
-                        glob::matches(pattern, &meta.display_name)
-                    }
-                    _ => true,
-                }
-            }
-        });
-        let sorter = gtk::CustomSorter::new({
-            let state = state.clone();
-            move |a, b| match (file_item(a), file_item(b)) {
-                (Some(a), Some(b)) => {
-                    meta::compare(&a.meta(), &b.meta(), &state.sort.borrow()).into()
-                }
-                _ => gtk::Ordering::Equal,
-            }
-        });
-        let filtered = gtk::FilterListModel::new(Some(store.clone()), Some(filter.clone()));
-        let sorted = gtk::SortListModel::new(Some(filtered), Some(sorter.clone()));
-        // Sorting 50,000 items in one go would stall the main loop.
-        sorted.set_incremental(true);
-        let selection = gtk::MultiSelection::new(Some(sorted.clone()));
-        Self {
-            store,
-            filter,
-            sorter,
-            sorted,
+        let shown = Shown {
+            sort,
+            show_hidden,
+            glob: None,
+            needle: None,
+        };
+        let listing = Listing::empty(&shown);
+        let selection = gtk::MultiSelection::new(Some(listing.sorted().clone()));
+        Self(Rc::new(Hub {
             selection,
-            state,
-            by_uri: RefCell::default(),
-            hidden: Cell::new(0),
-        }
+            listing: RefCell::new(listing),
+            shown: RefCell::new(shown),
+            watcher: RefCell::default(),
+            reselect: Cell::new(false),
+            lent: Cell::new(false),
+        }))
     }
 
-    /// The selection model that views display.
+    /// The selection model that views display. It stays the same object
+    /// whatever folder is shown.
     pub fn selection(&self) -> &gtk::MultiSelection {
-        &self.selection
+        &self.0.selection
     }
 
-    /// The sort model, exposed for its `pending` property.
-    pub fn sorted(&self) -> &gtk::SortListModel {
-        &self.sorted
+    /// The sort model of the folder shown now, for its `pending` property.
+    pub fn sorted(&self) -> gtk::SortListModel {
+        self.0.listing.borrow().sorted().clone()
     }
 
-    /// Removes every item.
-    pub fn clear(&self) {
-        self.store.remove_all();
-        self.by_uri.borrow_mut().clear();
-        self.hidden.set(0);
+    /// Sets who hears what the listing shown reports, now and after it is
+    /// replaced. It must capture its owner weakly.
+    pub fn connect_notice(&self, watcher: impl Fn(Notice<'_>) + 'static) {
+        self.0.watcher.replace(Some(Rc::new(watcher)));
     }
 
-    /// Appends one loader batch with a single `splice`.
-    pub fn append_batch(&self, batch: Vec<FileMeta>) {
-        let mut hidden = self.hidden.get();
-        let mut by_uri = self.by_uri.borrow_mut();
-        let items: Vec<FileItem> = batch
-            .into_iter()
-            .map(|meta| {
-                hidden += usize::from(meta.hidden);
-                let item = FileItem::new(meta);
-                by_uri.insert(item.clone());
-                item
-            })
-            .collect();
-        drop(by_uri);
-        self.hidden.set(hidden);
-        self.store.extend_from_slice(&items);
+    /// How this column shows a folder, for a listing made for it.
+    pub fn shown(&self) -> Shown {
+        self.0.shown.borrow().clone()
     }
 
-    /// Adds a file reported by the monitor, or updates it when already listed.
-    pub fn upsert(&self, meta: FileMeta) {
-        let existing = self.by_uri.borrow().get(&meta.uri);
-        let Some(item) = existing else {
-            self.hidden
-                .set(self.hidden.get() + usize::from(meta.hidden));
-            let item = FileItem::new(meta);
-            self.by_uri.borrow_mut().insert(item.clone());
-            self.store.append(&item);
-            return;
+    /// Shows `listing` in this column's order and with its filters, and
+    /// returns the one shown before, which the caller keeps or discards.
+    /// A listing that was lent is the other column's by now; the empty
+    /// listing is returned in its place.
+    pub fn adopt(&self, listing: Listing) -> Listing {
+        let hub = &self.0;
+        let old = hub.listing.replace(listing.clone());
+        let old = if hub.lent.replace(false) {
+            Listing::empty(&hub.shown.borrow())
+        } else {
+            old.set_handler(None);
+            old
         };
-        let was_selected = self
-            .position_of_item(&item)
-            .is_some_and(|position| self.selection.is_selected(position));
-        let was_hidden = item.meta().hidden;
-        let hidden = self.hidden.get() - usize::from(was_hidden) + usize::from(meta.hidden);
-        self.hidden.set(hidden);
-        item.set_meta(meta);
-        if let Some(position) = self.store.find(&item) {
-            // Re-announce the item so that filter, sort and bound cells refresh.
-            self.store.items_changed(position, 1, 1);
+        listing.show_as(&hub.shown.borrow());
+        listing.catch_up_yank();
+        let weak = Rc::downgrade(hub);
+        listing.set_handler(Some(Rc::new(move |notice| {
+            if let Some(hub) = weak.upgrade() {
+                hub.heard(notice);
+            }
+        })));
+        hub.reselect.set(false);
+        let (before, after) = (hub.selection.n_items(), listing.sorted().n_items());
+        if before > 0 && after / ITEMS_PER_ROW_WORTH_KEEPING > before.min(ROWS_KEPT) {
+            hub.selection.set_model(gio::ListModel::NONE);
         }
-        if was_selected && let Some(position) = self.position_of_item(&item) {
-            self.selection.select_item(position, false);
-        }
+        hub.selection.set_model(Some(listing.sorted()));
+        old
     }
 
-    /// Removes the file with this URI; returns whether it was selected.
-    pub fn remove(&self, uri: &str) -> bool {
-        let Some(item) = self.by_uri.borrow_mut().remove(uri) else {
-            return false;
-        };
-        let was_selected = self
-            .position_of_item(&item)
-            .is_some_and(|position| self.selection.is_selected(position));
-        self.hidden
-            .set(self.hidden.get() - usize::from(item.meta().hidden));
-        if let Some(position) = self.store.find(&item) {
-            self.store.remove(position);
-        }
-        was_selected
+    /// Hands the listing shown to another column, which adopts it, while
+    /// this one goes on showing it until it is given something else. The
+    /// rows built for it are then reused instead of being torn down now
+    /// and built again a moment later.
+    pub fn lend(&self) -> Listing {
+        self.0.lent.set(true);
+        self.0.listing.borrow().clone()
     }
 
-    /// Replaces `from` with `to`, keeping the item selected if it was.
-    pub fn rename(&self, from: &str, to: FileMeta) {
-        let uri = to.uri.clone();
-        let was_selected = self.remove(from);
-        self.upsert(to);
-        if was_selected && let Some(position) = self.position_of(&uri) {
-            self.selection.select_item(position, false);
-        }
+    /// Shows no folder and returns the listing shown before.
+    pub fn clear(&self) -> Listing {
+        let empty = Listing::empty(&self.0.shown.borrow());
+        self.adopt(empty)
+    }
+
+    /// Where the listing shown is with reading its folder.
+    pub fn phase(&self) -> Phase {
+        self.0.listing.borrow().phase()
+    }
+
+    /// Capacity of the filesystem the folder shown is on, once known.
+    pub fn fs_info(&self) -> FsInfo {
+        self.0.listing.borrow().fs_info()
     }
 
     /// Shows or hides hidden files.
     pub fn set_show_hidden(&self, show: bool) {
-        if self.state.show_hidden.replace(show) != show {
-            self.filter.changed(if show {
-                gtk::FilterChange::LessStrict
-            } else {
-                gtk::FilterChange::MoreStrict
-            });
-        }
+        self.0.shown.borrow_mut().show_hidden = show;
+        self.0.listing.borrow().set_show_hidden(show);
     }
 
     /// Whether hidden files are shown.
     pub fn show_hidden(&self) -> bool {
-        self.state.show_hidden.get()
+        self.0.shown.borrow().show_hidden
     }
 
     /// Sets or clears the name filter.
     pub fn set_glob(&self, pattern: Option<String>) {
         let pattern = pattern.filter(|p| !p.is_empty());
-        if *self.state.glob.borrow() != pattern {
-            self.state.glob.replace(pattern);
-            self.filter.changed(gtk::FilterChange::Different);
-        }
+        self.0.shown.borrow_mut().glob = pattern.clone();
+        self.0.listing.borrow().set_glob(pattern);
     }
 
     /// The active name filter.
     pub fn glob(&self) -> Option<String> {
-        self.state.glob.borrow().clone()
+        self.0.shown.borrow().glob.clone()
     }
 
     /// Sets or clears the `f` filter. Unlike the glob it also hides folders.
     pub fn set_needle(&self, needle: Option<String>) {
         let needle = needle.filter(|n| !n.is_empty());
-        if *self.state.needle.borrow() != needle {
-            self.state.needle.replace(needle);
-            self.filter.changed(gtk::FilterChange::Different);
-        }
+        self.0.shown.borrow_mut().needle = needle.clone();
+        self.0.listing.borrow().set_needle(needle);
     }
 
     /// The active `f` filter.
     pub fn needle(&self) -> Option<String> {
-        self.state.needle.borrow().clone()
+        self.0.shown.borrow().needle.clone()
     }
 
     /// Changes the sort order.
     pub fn set_sort(&self, sort: SortSpec) {
-        if *self.state.sort.borrow() != sort {
-            self.state.sort.replace(sort);
-            self.sorter.changed(gtk::SorterChange::Different);
-        }
+        self.0.shown.borrow_mut().sort = sort.clone();
+        self.0.listing.borrow().set_sort(sort);
     }
 
     /// The active sort order.
     pub fn sort(&self) -> SortSpec {
-        self.state.sort.borrow().clone()
+        self.0.shown.borrow().sort.clone()
     }
 
     /// Number of items shown.
     pub fn visible_count(&self) -> usize {
-        self.selection.n_items() as usize
+        self.0.selection.n_items() as usize
     }
 
     /// Number of items in the folder, shown or not.
     pub fn total_count(&self) -> usize {
-        self.store.n_items() as usize
+        self.0.listing.borrow().total_count()
     }
 
     /// Number of hidden files that are currently not shown.
     pub fn hidden_count(&self) -> usize {
-        if self.state.show_hidden.get() {
+        if self.show_hidden() {
             0
         } else {
-            self.hidden.get()
+            self.0.listing.borrow().hidden_files()
         }
     }
 
     /// The item at a view position.
     pub fn item_at(&self, position: u32) -> Option<FileItem> {
-        self.selection.item(position).and_downcast()
+        self.0.selection.item(position).and_downcast()
     }
 
     /// View position of the item with this URI, if it is shown.
     pub fn position_of(&self, uri: &str) -> Option<u32> {
-        let item = self.by_uri.borrow().get(uri)?;
-        self.position_of_item(&item)
+        self.0.position_of(uri)
     }
 
     /// View position of an item, if it is shown.
     pub fn position_of_item(&self, item: &FileItem) -> Option<u32> {
-        (0..self.selection.n_items())
-            .find(|position| self.selection.item(*position).as_ref() == Some(item.upcast_ref()))
+        self.0.position_of_item(item)
     }
 
     /// Names in view order, for the find commands.
     pub fn names(&self) -> Vec<String> {
-        (0..self.selection.n_items())
+        (0..self.0.selection.n_items())
             .filter_map(|position| self.item_at(position))
             .map(|item| item.meta().display_name.clone())
             .collect()
@@ -285,14 +265,12 @@ impl FolderModel {
 
     /// Brings every item's yank mark in line with the yanked set.
     pub fn refresh_yank(&self) {
-        for item in self.store.iter::<FileItem>().flatten() {
-            item.refresh_yank();
-        }
+        self.0.listing.borrow().refresh_yank();
     }
 
     /// Selected items in view order.
     pub fn selected(&self) -> Vec<FileItem> {
-        let bitset = self.selection.selection();
+        let bitset = self.0.selection.selection();
         (0..bitset.size())
             .filter_map(|index| self.item_at(bitset.nth(index as u32)))
             .collect()
@@ -300,6 +278,6 @@ impl FolderModel {
 
     /// Number of selected items, without materialising them.
     pub fn selected_count(&self) -> usize {
-        self.selection.selection().size() as usize
+        self.0.selection.selection().size() as usize
     }
 }

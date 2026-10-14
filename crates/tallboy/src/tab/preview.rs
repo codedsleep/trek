@@ -11,6 +11,7 @@
 
 use crate::view::{
     FileItem, Style,
+    listing::{Listing, ListingCache},
     mini::{self, MiniColumn},
 };
 use gtk::{gdk, gdk_pixbuf, gio, glib, pango, prelude::*};
@@ -123,8 +124,8 @@ struct Inner {
 pub struct Preview(Rc<Inner>);
 
 impl Preview {
-    pub fn new(style: Style, sort: SortSpec, show_hidden: bool) -> Self {
-        let folder = MiniColumn::new(style, sort, show_hidden);
+    pub fn new(style: Style, sort: SortSpec, show_hidden: bool, cache: Rc<ListingCache>) -> Self {
+        let folder = MiniColumn::new(style, sort, show_hidden, cache, false);
         let text = gtk::Label::new(None);
         text.set_xalign(0.0);
         text.set_yalign(0.0);
@@ -221,7 +222,17 @@ impl Preview {
         inner.stack.set_visible_child_name(EMPTY);
     }
 
-    /// Previews `item` once the cursor has rested on it.
+    /// Gives up the folder previewed if it is `uri`, for the files column,
+    /// which is about to show that folder. The preview is then of nothing.
+    pub fn yield_listing(&self, uri: &str) -> Option<Listing> {
+        let listing = self.0.folder.yield_listing(uri)?;
+        self.0.generation.set(self.0.generation.get() + 1);
+        self.0.shown.replace(None);
+        Some(listing)
+    }
+
+    /// Previews `item` once the cursor has rested on it, or in the next
+    /// frame when it is a folder the tab still has the listing of.
     pub fn show(&self, item: Option<&FileItem>, options: Options) {
         let inner = &self.0;
         let Some(item) = item else {
@@ -237,6 +248,29 @@ impl Preview {
         inner.generation.set(inner.generation.get() + 1);
         let generation = inner.generation.get();
         let icon = item.icon();
+        if meta.file_type == gio::FileType::Directory && inner.folder.is_kept(&meta.uri, options) {
+            // Nothing to wait for: the folder just left, shown again. It
+            // still comes one frame after the files, so that building its
+            // rows does not hold back the frame that answers the key.
+            if let Some(timer) = inner.rest.take() {
+                timer.remove();
+            }
+            let weak = Rc::downgrade(&self.0);
+            let frames = Cell::new(0u8);
+            inner.stack.add_tick_callback(move |_, _| {
+                if frames.replace(1) == 0 {
+                    return glib::ControlFlow::Continue;
+                }
+                if let Some(this) = weak.upgrade().map(Self)
+                    && this.0.generation.get() == generation
+                {
+                    this.load(meta.clone(), icon.clone(), options, generation);
+                }
+                glib::ControlFlow::Break
+            });
+            return;
+        }
+        let item = item.clone();
         let weak = Rc::downgrade(&self.0);
         let timer = glib::timeout_add_local_once(REST, move || {
             let Some(this) = weak.upgrade().map(Self) else {
@@ -244,6 +278,11 @@ impl Preview {
             };
             this.0.rest.replace(None);
             if this.0.generation.get() == generation {
+                // A file listed by name may not have been read yet, and
+                // what is previewed goes by its type.
+                item.settle_type();
+                let meta = item.meta().clone();
+                let icon = item.icon();
                 this.load(meta, icon, options, generation);
             }
         });

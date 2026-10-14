@@ -363,7 +363,7 @@ impl MainWindow {
                 if let Some(window) = weak.upgrade() {
                     // What is yanked, and so which files are marked.
                     for tab in window.all_tabs() {
-                        tab.model().refresh_yank();
+                        tab.refresh_yank();
                     }
                     window.queue_refresh();
                 }

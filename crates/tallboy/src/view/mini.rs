@@ -2,18 +2,23 @@
 //! the parent folder to the left of a tab's files, and the folder under the
 //! cursor to their right.
 //!
-//! It owns its own `Folder`, so it loads, sorts and follows changes the way
-//! a tab does, and it can mark one file — the folder the tab is in, seen
-//! from its parent — with the cursor's highlight.
+//! It shows a `Listing` the way the files column does, and the two trade
+//! them: the listing shown here becomes the tab's when the folder is
+//! entered, and the tab's comes here when it is left. It can mark one file —
+//! the folder the tab is in, seen from its parent — with the cursor's
+//! highlight.
 
-use super::{FileItem, FolderModel, Style, lines};
+use super::{
+    FileItem, FolderModel, Style, lines,
+    listing::{Listing, ListingCache, Notice},
+};
 use gtk::{gio, glib, prelude::*};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
 };
 use tallboy_core::sort::SortSpec;
-use tallboy_fs::folder::{Folder, FolderEvent, Options};
+use tallboy_fs::folder::Options;
 
 type Activate = Rc<dyn Fn(FileItem)>;
 
@@ -21,7 +26,8 @@ struct Inner {
     scroller: gtk::ScrolledWindow,
     view: gtk::ListView,
     model: FolderModel,
-    folder: RefCell<Option<Folder>>,
+    /// The tab's kept listings: where this column's go and come from.
+    cache: Rc<ListingCache>,
     /// URI of the folder shown.
     shown: RefCell<Option<String>>,
     /// URI of the file to mark, and the item once it is listed.
@@ -36,9 +42,17 @@ struct Inner {
 pub struct MiniColumn(Rc<Inner>);
 
 impl MiniColumn {
-    pub fn new(style: Style, sort: SortSpec, show_hidden: bool) -> Self {
+    /// `marks` is whether the column can mark a file, as the parent column
+    /// does and the preview does not.
+    pub fn new(
+        style: Style,
+        sort: SortSpec,
+        show_hidden: bool,
+        cache: Rc<ListingCache>,
+        marks: bool,
+    ) -> Self {
         let model = FolderModel::new(sort, show_hidden);
-        let view = lines::build_plain(&model, style);
+        let view = lines::build_plain(&model, style, marks);
         let scroller = gtk::ScrolledWindow::new();
         scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
         scroller.set_hexpand(true);
@@ -48,13 +62,24 @@ impl MiniColumn {
             scroller,
             view,
             model,
-            folder: RefCell::default(),
+            cache,
             shown: RefCell::default(),
             mark: RefCell::default(),
             marked: RefCell::default(),
             generation: Cell::new(0),
             activate: RefCell::default(),
         }));
+        let weak = Rc::downgrade(&this.0);
+        this.0.model.connect_notice(move |notice| {
+            let Some(this) = weak.upgrade().map(Self) else {
+                return;
+            };
+            match notice {
+                Notice::Finished => this.mark_when_sorted(),
+                Notice::RootGone => this.clear(),
+                _ => {}
+            }
+        });
         let weak = Rc::downgrade(&this.0);
         this.0.view.connect_activate(move |_, position| {
             let Some(inner) = weak.upgrade() else { return };
@@ -86,20 +111,49 @@ impl MiniColumn {
         self.0.model.set_show_hidden(show_hidden);
     }
 
+    /// Brings the yank marks in line with the yanked set.
+    pub fn refresh_yank(&self) {
+        self.0.model.refresh_yank();
+    }
+
     /// The folder shown, by URI.
     pub fn shown(&self) -> Option<String> {
         self.0.shown.borrow().clone()
     }
 
-    /// Shows nothing and stops watching the folder.
-    pub fn clear(&self) {
+    /// Whether showing `uri` would take no reading: the tab has kept it.
+    pub fn is_kept(&self, uri: &str, options: Options) -> bool {
+        self.0.cache.holds(uri, options)
+    }
+
+    /// Forgets which folder it shows and takes the mark off.
+    fn forget(&self) {
         let inner = &self.0;
         inner.generation.set(inner.generation.get() + 1);
-        inner.folder.replace(None);
         inner.shown.replace(None);
         inner.mark.replace(None);
-        inner.marked.replace(None);
-        inner.model.clear();
+        // The highlight is this column's; the listing may be shown elsewhere next.
+        if let Some(marked) = inner.marked.take() {
+            marked.hover(false);
+        }
+    }
+
+    /// Shows nothing. The folder shown stays with the tab for a while.
+    pub fn clear(&self) {
+        self.forget();
+        let listing = self.0.model.clear();
+        self.0.cache.put(listing);
+    }
+
+    /// Gives up the listing shown if it is of `uri`, for the files column,
+    /// which is about to show that folder. The rows stay as they are until
+    /// this column is told what to show next.
+    pub fn yield_listing(&self, uri: &str) -> Option<Listing> {
+        let shown = self.0.shown.borrow().as_deref() == Some(uri);
+        shown.then(|| {
+            self.forget();
+            self.0.model.lend()
+        })
     }
 
     /// Shows the folder at `uri`, marking the file `mark` in it. Showing the
@@ -113,43 +167,35 @@ impl MiniColumn {
             }
             return;
         }
-        self.clear();
-        let generation = inner.generation.get();
-        inner.shown.replace(Some(uri.to_owned()));
-        inner.mark.replace(mark.map(str::to_owned));
         // No mount operation: a column beside the files never asks for a
         // password or mounts anything; an unreachable folder stays empty.
-        let Ok(folder) = Folder::new(&gio::File::for_uri(uri), options, None) else {
+        let listing = inner.cache.take(uri, options).or_else(|| {
+            Listing::load(
+                &gio::File::for_uri(uri),
+                options,
+                None,
+                &inner.model.shown(),
+            )
+            .ok()
+        });
+        let Some(listing) = listing else {
+            self.clear();
+            inner.shown.replace(Some(uri.to_owned()));
             return;
         };
-        let events = folder.events.clone();
-        inner.folder.replace(Some(folder));
-        let weak = Rc::downgrade(&self.0);
-        glib::spawn_future_local(async move {
-            while let Ok(event) = events.recv().await {
-                let Some(this) = weak.upgrade().map(Self) else {
-                    break;
-                };
-                if this.0.generation.get() != generation {
-                    break;
-                }
-                this.apply(event);
-            }
-        });
-    }
-
-    fn apply(&self, event: FolderEvent) {
-        let model = &self.0.model;
-        match event {
-            FolderEvent::Batch(batch) => model.append_batch(batch),
-            FolderEvent::Added(meta) | FolderEvent::Changed(meta) => model.upsert(meta),
-            FolderEvent::Removed(uri) => {
-                model.remove(&uri);
-            }
-            FolderEvent::Renamed { from, to } => model.rename(&from, to),
-            FolderEvent::Finished => self.mark_when_sorted(),
-            FolderEvent::RootGone => self.clear(),
-            FolderEvent::Started | FolderEvent::Error(_) | FolderEvent::FsInfo(_) => {}
+        self.forget();
+        inner.shown.replace(Some(uri.to_owned()));
+        inner.mark.replace(mark.map(str::to_owned));
+        let loaded = listing.is_loaded();
+        // Straight from one folder to the next: the rows are bound to the
+        // new files instead of being built again.
+        let old = inner.model.adopt(listing);
+        inner.cache.put(old);
+        if loaded && inner.model.sorted().pending() == 0 {
+            // Kept in this order already: marked before the next frame.
+            self.apply_mark();
+        } else if loaded {
+            self.mark_when_sorted();
         }
     }
 
