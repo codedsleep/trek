@@ -14,8 +14,10 @@
 #   TALLBOY_ALLOW_ROOTS=/run/media/$USER/STICK scripts/dev-run.sh
 #
 # Because the session is isolated, bookmarks, trash, thumbnails and default
-# applications seen here are the dev profile's, not the real ones, and
-# applications opened from tallboy start with the same isolated settings.
+# applications seen here are the dev profile's, not the real ones. What
+# tallboy starts (the terminal, the editor, applications) gets the owner's
+# own XDG directories and session bus back through TALLBOY_HOST_*, so nvim
+# and kitty come up with their real configuration.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 dev_home="$HOME/.cache/vim-centric-fm-dev"
@@ -33,6 +35,9 @@ if [[ $build == release ]]; then cargo build --release -p tallboy; else cargo bu
 "$root/scripts/mkfixture.sh" >/dev/null
 mkdir -p "$dev_home"/{config,cache,data,state}
 unset TALLBOY_UNLOCKED
+for name in XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME DBUS_SESSION_BUS_ADDRESS; do
+    export "TALLBOY_HOST_$name=${!name-}"
+done
 export XDG_CONFIG_HOME="$dev_home/config" XDG_CACHE_HOME="$dev_home/cache"
 export XDG_DATA_HOME="$dev_home/data" XDG_STATE_HOME="$dev_home/state"
 export TALLBOY_ALLOW_ROOTS="$fixture;$dev_home${TALLBOY_ALLOW_ROOTS:+;$TALLBOY_ALLOW_ROOTS}"

@@ -201,7 +201,10 @@ command that undoes the first of those.
 
 `dev-run.sh` uses its own D-Bus session and its own configuration, cache and
 data folders under `~/.cache/vim-centric-fm-dev`, so its bookmarks, trash can
-and default applications are not yours.
+and default applications are not yours. What it starts — the terminal, the
+editor, applications — runs with your own settings: the script hands tallboy
+your folders and session bus as `TALLBOY_HOST_*`, and tallboy gives them back
+to every program it starts.
 
 ### Coming from PCManFM
 

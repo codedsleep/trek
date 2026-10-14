@@ -151,6 +151,23 @@ fn terminal_argv_has_no_shell_interpolation() {
         editor(None, Some("missing -p")),
         Err(terminal::TerminalError::NoEditor(program)) if program == "missing"
     ));
+    let host = terminal::host_environment(
+        [
+            ("TALLBOY_HOST_XDG_CONFIG_HOME", "/home/owner/.config"),
+            ("TALLBOY_HOST_XDG_DATA_HOME", ""),
+            ("XDG_CACHE_HOME", "/isolated/cache"),
+        ]
+        .map(|(name, value)| (name.into(), value.into())),
+    );
+    assert_eq!(
+        host,
+        [
+            ("XDG_CONFIG_HOME".into(), Some("/home/owner/.config".into())),
+            ("TALLBOY_HOST_XDG_CONFIG_HOME".into(), None),
+            ("XDG_DATA_HOME".into(), None),
+            ("TALLBOY_HOST_XDG_DATA_HOME".into(), None),
+        ]
+    );
     let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
     fs::create_dir_all(&root).unwrap();
     let t = tempfile::tempdir_in(root).unwrap();

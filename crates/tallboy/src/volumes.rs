@@ -177,7 +177,7 @@ fn perform(app: &App, choice: &str, root: &Location) {
         open_in_file_manager(app, root.clone());
         return;
     };
-    let context = gtk::gdk::Display::default().map(|display| display.app_launch_context());
+    let context = crate::open::launch_context();
     if let Err(e) = handler.launch_uris(&[root.to_uri()], context.as_ref()) {
         log::warn!("Autorun: {e}");
     }

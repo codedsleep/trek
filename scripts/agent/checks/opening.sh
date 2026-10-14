@@ -1,6 +1,7 @@
 # Opening files (SCOPE 6.12–6.16). Run with:
 #   scripts/agent-run.sh --env TERMINAL=$HOME/.cache/tallboy-agent/opening/bin/fake-term \
 #       --env VISUAL=$HOME/.cache/tallboy-agent/opening/bin/fake-edit \
+#       --env TALLBOY_HOST_XDG_CONFIG_HOME=$HOME/.cache/tallboy-agent/opening/host-config \
 #       -- ~/.cache/tallboy-fixture/names < scripts/agent/checks/opening.sh
 # Applications, the terminal and the editor are stand-ins; the applications
 # and the terminal append their arguments to $OUT/launch.log.
@@ -11,6 +12,10 @@ rm -rf "$work"; mkdir -p "$work/bin" "$work/files" "$XDG_DATA_HOME/applications"
 cat >"$work/bin/record" <<SH
 #!/bin/sh
 { printf 'app=%s argc=%s cwd=%s\n' "\$TB_APP" "\$#" "\$PWD"; for a in "\$@"; do printf '  arg=[%s]\n' "\$a"; done; } >>"$OUT/launch.log"
+SH
+# What a started program finds in its environment, apart from the launch log.
+cat >>"$work/bin/record" <<SH
+printf '%s config=%s host=%s\n' "\$TB_APP" "\$XDG_CONFIG_HOME" "\${TALLBOY_HOST_XDG_CONFIG_HOME-unset}" >>"$work/environment"
 SH
 # The terminal records what it was asked to run, and where it was started.
 cat >"$work/bin/fake-term" <<SH
@@ -61,6 +66,7 @@ check "the terminal was asked to run the editor" has "$(log | tr -d '\n')" "app=
 check "a name with shell characters reaches the editor as one argument" has "$(log)" "arg=\[$work/files/; touch pwned\]"
 check "nothing in the name was executed" test ! -e "$work/files/pwned"
 check "the default application for text was not asked" test "$(log | grep -c app=text)" = 0
+check "the terminal got the settings folder from before the isolation" grep -qx "term config=$work/host-config host=unset" "$work/environment"
 
 echo "--- three files of two kinds make two launches"
 : >"$OUT/launch.log"
@@ -68,6 +74,7 @@ echo "--- three files of two kinds make two launches"
 only "*.[tp][xn][tg]"; act open; settle 1.2
 check "the editor got both text files in one terminal" has "$(log)" 'app=term argc=4'
 check "the image application got the picture" has "$(log)" 'app=image argc=1'
+check "so did the application" grep -qx "image config=$work/host-config host=unset" "$work/environment"
 
 echo "--- what counts as text"
 : >"$OUT/launch.log"

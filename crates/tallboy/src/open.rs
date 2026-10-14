@@ -65,9 +65,17 @@ pub fn reap(mut child: Child) {
 }
 
 /// The launch context that carries the activation token, so the started
-/// application can take focus under Wayland.
-fn launch_context() -> Option<gio::AppLaunchContext> {
-    gtk::gdk::Display::default().map(|display| display.app_launch_context().upcast())
+/// application can take focus under Wayland, and the environment started
+/// programs get in place of an isolated tallboy's own.
+pub fn launch_context() -> Option<gio::AppLaunchContext> {
+    let context = gtk::gdk::Display::default()?.app_launch_context();
+    for (name, value) in terminal::host_environment(std::env::vars_os()) {
+        match value {
+            Some(value) => context.setenv(name, value),
+            None => context.unsetenv(name),
+        }
+    }
+    Some(context.upcast())
 }
 
 /// Whether a path lies under an XDG applications directory (launcher trust).

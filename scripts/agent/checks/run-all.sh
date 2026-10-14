@@ -56,7 +56,9 @@ one() {
         opening)
             seed "$classic"
             run_session --keep --env "TERMINAL=$agent/opening/bin/fake-term" \
-                --env "VISUAL=$agent/opening/bin/fake-edit" -- "$fixture/names" <"$checks/opening.sh"
+                --env "VISUAL=$agent/opening/bin/fake-edit" \
+                --env "TALLBOY_HOST_XDG_CONFIG_HOME=$agent/opening/host-config" \
+                -- "$fixture/names" <"$checks/opening.sh"
             ;;
         single-click)
             seed "[config]\nsingle_click=1\nauto_selection_delay=300\n$classic"

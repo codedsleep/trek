@@ -186,15 +186,42 @@ impl Terminal {
         spawn(&self.command_argv(command, hold)?, directory)
     }
 }
+/// Prefix of the variables that carry a started program's environment.
+pub const HOST_PREFIX: &str = "TALLBOY_HOST_";
+/// What a started program's environment differs in from tallboy's own, as
+/// (name, value) with None for a variable to remove. A launcher that isolates
+/// tallboy (scripts/dev-run.sh) passes the value NAME had before as
+/// TALLBOY_HOST_NAME, empty when NAME was unset; started programs get NAME
+/// back and never see the TALLBOY_HOST_ variables.
+pub fn host_environment(
+    variables: impl IntoIterator<Item = (OsString, OsString)>,
+) -> Vec<(OsString, Option<OsString>)> {
+    let mut changes = vec![];
+    for (name, value) in variables {
+        let Some(host) = name.to_str().and_then(|n| n.strip_prefix(HOST_PREFIX)) else {
+            continue;
+        };
+        if !host.is_empty() {
+            changes.push((host.into(), Some(value).filter(|v| !v.is_empty())));
+        }
+        changes.push((name, None));
+    }
+    changes
+}
 /// Run an argument vector in a native directory; never invokes a shell.
 pub fn spawn(argv: &[OsString], directory: &gio::File) -> Result<Child, TerminalError> {
     use gio::prelude::*;
     let cwd = directory.path().ok_or(TerminalError::Remote)?;
     let program = argv.first().ok_or(TerminalError::Empty)?;
-    Ok(Command::new(program)
-        .args(&argv[1..])
-        .current_dir(cwd)
-        .spawn()?)
+    let mut command = Command::new(program);
+    command.args(&argv[1..]).current_dir(cwd);
+    for (name, value) in host_environment(std::env::vars_os()) {
+        match value {
+            Some(value) => command.env(name, value),
+            None => command.env_remove(name),
+        };
+    }
+    Ok(command.spawn()?)
 }
 /// Run a user's tokenized command, directly or in a selected terminal.
 pub fn run(
