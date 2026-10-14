@@ -1,4 +1,4 @@
-//! Line view: one file per row, the way Yazi draws a column.
+//! Line view: one file per row, as a terminal file manager draws a column.
 //!
 //! A row is a gutter, the icon, the name, a symbolic link's target and, at
 //! the right, whatever the linemode asks for. The cursor and the yank mark

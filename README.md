@@ -1,6 +1,6 @@
 # trek
 
-**Elevator pitch:** A graphical file manager for Linux, in Rust and GTK 4, driven from the keyboard with the keys of [Yazi](https://yazi-rs.github.io) — parent folder, files and preview side by side, `h` `j` `k` `l` to move, `y` `x` `p` to yank, cut and paste, `z` to fuzzy-find — while the mouse, drag and drop, menus, trash can, volumes and remote places all still work.
+**Elevator pitch:** A graphical file manager for Linux, in Rust and GTK 4, driven from the keyboard with vim motions — parent folder, files and preview side by side, `h` `j` `k` `l` to move, `y` `x` `p` to yank, cut and paste, `z` to fuzzy-find — while the mouse, drag and drop, menus, trash can, volumes and remote places all still work.
 
 > **This build is locked.** Until its review is finished it changes files only
 > inside its test folders. Read [The safety lock](#the-safety-lock) before
@@ -8,7 +8,7 @@
 
 ## Features
 
-- **Yazi's keymap.** All 116 bindings of Yazi 26.9's default `[mgr]` keymap, with Yazi's own descriptions; `~` or `F1` lists them, and a started sequence lists its continuations at the bottom of the window.
+- **Vim motions.** 116 bindings — `h` `j` `k` `l`, `gg` `G`, `Ctrl+U` `Ctrl+D`, `v` for visual mode, `y` `x` `p` to yank, cut and paste, `/` `n` `N` to find, and `g`, `m`, `c` and `,` to start a sequence — each with a description; `~` or `F1` lists them, and a started sequence lists its continuations at the bottom of the window.
 - **Three columns.** Parent folder, files and a preview that lists a folder, shows the start of a text file, draws an image, and gives anything else a card with its type, size, date and permissions.
 - **Fuzzy finder.** `z` lists everything below the folder and matches as you type with fzf's query syntax, on all cores, honouring `.gitignore`. No fzf needed.
 - **Fast folders.** A folder is listed on a thread of its own, read once, and handed between columns as you move; a tab keeps the last dozen folders it showed, still watched for changes.
@@ -77,9 +77,9 @@ scripts/install.sh --uninstall
 | `;` `:`                                                | shell command, here or in a terminal; the files are `"$@"`           |
 | `J` `K`, `Tab`, `w`, `q` `Ctrl+C`                      | scroll the preview, properties, running jobs, close                  |
 
-As in Yazi, the cursor and the selection are different things: moving the cursor selects nothing, and a command acts on the selected files, or on the file under the cursor when none is selected. Yanked files are on the clipboard, where other programs can paste them, and files copied in other programs can be pasted with `p`.
+The cursor and the selection are different things: moving the cursor selects nothing, and a command acts on the selected files, or on the file under the cursor when none is selected. Yanked files are on the clipboard, where other programs can paste them, and files copied in other programs can be pasted with `p`.
 
-Keys are commands only while the files have the keyboard. In the input line, the location entry or a dialog, every key is text; the input line has Yazi's insert-mode keys (`Ctrl+A` `Ctrl+E` `Ctrl+U` `Ctrl+K` `Ctrl+W` and friends). A question is answered with `y` or `Enter`, and `n` or `Esc`.
+Keys are commands only while the files have the keyboard. In the input line, the location entry or a dialog, every key is text; the input line has vim's insert-mode editing keys (`Ctrl+A` `Ctrl+E` `Ctrl+U` `Ctrl+K` `Ctrl+W` and friends). A question is answered with `y` or `Enter`, and `n` or `Esc`.
 
 ### The fuzzy finder
 
@@ -91,9 +91,9 @@ Keys are commands only while the files have the keyboard. In the input line, the
 - The folder is listed in the background and matched on all cores, so a home folder with several hundred thousand files can be searched while it is still being read. A million files is the limit; past it the count says so.
 - Only folders on this computer can be searched, not the trash can or a network location.
 
-Yazi starts fzf for this. fzf draws in a terminal, so here the list is the window's own; fzf does not have to be installed.
+The list is the window's own; fzf does not have to be installed.
 
-### What differs from Yazi
+### Notes on the keys
 
 - Eight bindings answer "not available" in the status line and do nothing else: `s` and `S` (search with fd and ripgrep), `Ctrl+S`, `Z` (zoxide), `A` (bulk create), `_` (relative link), `Ctrl+-` (hard link) and `,r` (random order).
 - `r` renames one file; with several selected it says so instead of opening an editor.
@@ -104,11 +104,11 @@ Yazi starts fzf for this. fzf draws in a terminal, so here the list is the windo
 - `a` creates one file or one folder, not a path of several.
 - In the icon, thumbnail and compact views `j` and `k` step through the files in order; `h` and `l` still leave and enter.
 
-### Keys that are not Yazi's
+### Window keys
 
-Yazi leaves these alone, and a program with a window is expected to have them: `Backspace` (parent), `Delete` and `Shift+Delete`, `F2`, `F5`, `Alt+Enter`, `Ctrl+L`, `Alt+Left` `Alt+Right` `Alt+Up` `Alt+Home`, `Ctrl+T` `Ctrl+W` `Ctrl+N` `Ctrl+Q`, `Ctrl+Tab`, `Ctrl+1`…`Ctrl+5` for the five views, `Ctrl+=` `Alt+-` `Ctrl+0` to zoom, `F3` `F6` for dual-pane mode, `F7` `F8` for the parent and preview columns, `F9` for the side pane, `F10` for the menu and `F11` for full screen.
+Beside the vim motions, a program with a window is expected to have these: `Backspace` (parent), `Delete` and `Shift+Delete`, `F2`, `F5`, `Alt+Enter`, `Ctrl+L`, `Alt+Left` `Alt+Right` `Alt+Up` `Alt+Home`, `Ctrl+T` `Ctrl+W` `Ctrl+N` `Ctrl+Q`, `Ctrl+Tab`, `Ctrl+1`…`Ctrl+5` for the five views, `Ctrl+=` `Alt+-` `Ctrl+0` to zoom, `F3` `F6` for dual-pane mode, `F7` `F8` for the parent and preview columns, `F9` for the side pane, `F10` for the menu and `F11` for full screen.
 
-PCManFM's `Ctrl+C`, `Ctrl+X` and `Ctrl+V` are gone: `Ctrl+C` is Yazi's "close the tab", and half a set of clipboard keys would be a trap. So are `Ctrl+A` as an accelerator (it is Yazi's own), `Ctrl+R`, `Ctrl+D`, `Ctrl+B`, `Ctrl+H`, `Ctrl+E`, `Ctrl+I` and `Alt+1`…`Alt+0`, and typing a name to jump to it: that is `/` now.
+PCManFM's `Ctrl+C`, `Ctrl+X` and `Ctrl+V` are gone: `Ctrl+C` closes the tab, and half a set of clipboard keys would be a trap. So are `Ctrl+A` as an accelerator (it selects all), `Ctrl+R`, `Ctrl+D`, `Ctrl+B`, `Ctrl+H`, `Ctrl+E`, `Ctrl+I` and `Alt+1`…`Alt+0`, and typing a name to jump to it: that is `/` now.
 
 ## The window
 
@@ -188,7 +188,7 @@ Two things the lock does not cover and the review will not change:
 
 ## Differences from PCManFM
 
-Keys and layout are Yazi's, as described above. Everything else that is not listed here is meant to behave as PCManFM 1.4.0 does.
+Keys and layout are trek's own, as described above. Everything else that is not listed here is meant to behave as PCManFM 1.4.0 does.
 
 1. Find Files, templates, archivers, custom actions and the applications folder are absent; their menu items are disabled or omitted
 2. No desktop manager; its command-line options report that it is not built
@@ -242,7 +242,6 @@ Releases are built by GitHub Actions when a `v*` tag is pushed.
 ## Acknowledgements
 
 - [PCManFM](https://github.com/lxde/pcmanfm) and [libfm](https://github.com/lxde/libfm) by Hong Jen Yee (PCMan) and Andriy Grytsenko (LStranger) — trek began as a port of PCManFM 1.4.0 with libfm 1.4.1, and everything that is not keys or layout still behaves as they do.
-- [Yazi](https://yazi-rs.github.io) — the keymap, its descriptions and the three-column layout.
 - [fzf](https://github.com/junegunn/fzf) — the fuzzy finder's query syntax and keys.
 - [nucleo](https://crates.io/crates/nucleo) — fuzzy matching.
 - [ignore](https://crates.io/crates/ignore) — walking folders the way fd and ripgrep do.

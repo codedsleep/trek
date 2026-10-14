@@ -68,7 +68,7 @@ impl WhichKey {
             let entry = gtk::Box::new(gtk::Orientation::Horizontal, 10);
             entry.append(&key);
             entry.append(&desc);
-            // Filled column by column, as Yazi's is.
+            // Filled column by column.
             self.grid
                 .attach(&entry, (index / rows) as i32, (index % rows) as i32, 1, 1);
         }
@@ -83,14 +83,14 @@ impl WhichKey {
 // ---- what every entry over the folder area shares ----
 
 /// Esc, Ctrl+C and Ctrl+[: the keys that close an entry without doing
-/// anything, as in Yazi's input.
+/// anything, as in vim's command line.
 pub(super) fn is_cancel(key: gdk::Key, state: gdk::ModifierType) -> bool {
     let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
     let alt = state.contains(gdk::ModifierType::ALT_MASK);
     key == gdk::Key::Escape || (ctrl && !alt && matches!(key, gdk::Key::c | gdk::Key::bracketleft))
 }
 
-/// The editing keys of Yazi's input in insert mode that an entry does not
+/// The editing keys of vim's insert mode that an entry does not
 /// already have. Returns whether the key was one of them.
 pub(super) fn edit_key(entry: &gtk::Entry, key: gdk::Key, state: gdk::ModifierType) -> bool {
     let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);

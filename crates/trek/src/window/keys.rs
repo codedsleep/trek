@@ -11,8 +11,8 @@ use super::MainWindow;
 use gtk::{gdk, glib, prelude::*};
 use trek_core::keymap::{Code, Key, Match, Named};
 
-/// Keys that Yazi leaves alone and a file manager with a window is expected
-/// to have. They name window actions, and like the keymap they only apply
+/// Keys beside the vim motions that a file manager with a window is
+/// expected to have. They name window actions, and like the keymap they only apply
 /// while the files have the keyboard.
 const EXTRAS: &[(&str, &str)] = &[
     ("<Backspace>", "win.up"),
@@ -199,7 +199,7 @@ mod tests {
         for (_, accels) in actions::TARGETED {
             accelerators.extend(accels.iter().copied());
         }
-        let keymap = Keymap::yazi();
+        let keymap = Keymap::standard();
         let mut taken: Vec<Key> = keymap
             .bindings()
             .iter()

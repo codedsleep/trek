@@ -23,7 +23,9 @@ pub fn about(parent: &gtk::Window) {
         } else {
             "system-file-manager"
         })
-        .comments(format!("A file manager driven by Yazi's keys.\n{CREDIT}."))
+        .comments(format!(
+            "A file manager driven with vim motions.\n{CREDIT}."
+        ))
         .license_type(gtk::License::Gpl20)
         .website("https://github.com/codedsleep/trek")
         .modal(true)
@@ -36,8 +38,8 @@ pub fn about(parent: &gtk::Window) {
     dialog.present();
 }
 
-/// What the status line says for a command of Yazi's that this program
-/// has no counterpart for. The key list marks the same bindings, so the two
+/// What the status line says for a binding that this program has no
+/// counterpart for yet. The key list marks the same bindings, so the two
 /// cannot disagree.
 pub fn unavailable(action: Action) -> Option<&'static str> {
     Some(match action {
@@ -57,7 +59,7 @@ pub fn unavailable(action: Action) -> Option<&'static str> {
     })
 }
 
-/// Keys that are not Yazi's: what a program with a window adds.
+/// Keys beside the vim motions: what a program with a window adds.
 const WINDOW_KEYS: &[(&str, &str)] = &[
     ("Backspace", "Back to the parent directory"),
     ("Delete", "Trash selected files"),
@@ -148,7 +150,7 @@ pub fn keyboard(parent: &gtk::Window, keymap: &Keymap) {
         headings.push((heading, first..rows.len()));
     };
     section(
-        "Files — Yazi's keys",
+        "Files — vim motions",
         keymap
             .bindings()
             .iter()
@@ -241,7 +243,7 @@ mod tests {
     /// notice instead of doing something.
     #[test]
     fn eight_bindings_are_marked_unavailable() {
-        let keymap = Keymap::yazi();
+        let keymap = Keymap::standard();
         let marked: Vec<String> = keymap
             .bindings()
             .iter()

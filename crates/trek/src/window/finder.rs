@@ -1,8 +1,8 @@
 //! The fuzzy finder, `z`: a query, and under it the files below the folder
 //! that match it, best first. Enter goes to the one under the cursor.
 //!
-//! Yazi hands this to fzf, which needs a terminal to draw in. Here the list
-//! is drawn by the window and `fs::finder` does the walking and matching,
+//! fzf would need a terminal to draw in. Here the list is drawn by the
+//! window and `fs::finder` does the walking and matching,
 //! off the main loop. Like the input line it is an overlay child of the
 //! folder area, not a window.
 
@@ -433,9 +433,9 @@ fn marks(hit: &Hit, colour: Option<gdk::RGBA>) -> pango::AttrList {
 }
 
 impl MainWindow {
-    /// `z`: the fuzzy finder over everything below the folder shown. As
-    /// Yazi's fzf plugin does, Enter enters a folder and goes to a file's
-    /// folder with the cursor on the file.
+    /// `z`: the fuzzy finder over everything below the folder shown. Enter
+    /// enters a folder, and goes to a file's folder with the cursor on the
+    /// file.
     pub(super) fn ask_jump(&self, tab: &TabPage) {
         let Some(folder) = tab.location().path() else {
             self.notice("Only folders on this computer can be searched");

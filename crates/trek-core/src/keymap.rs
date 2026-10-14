@@ -1,9 +1,8 @@
-//! The key bindings of the file view: Yazi's default `[mgr]` keymap.
+//! The key bindings of the file view: vim motions.
 //!
-//! Keys are written in Yazi's notation (`j`, `G`, `<C-u>`, `<S-Enter>`,
-//! `<Space>`) and a binding is a sequence of them (`g g`). The table below is
-//! Yazi 26.9's `keymap-default.toml`, entry for entry and with its
-//! descriptions; the view, the which-key popup and the help overlay all read
+//! Keys are written in vim's notation (`j`, `G`, `<C-u>`, `<S-Enter>`,
+//! `<Space>`) and a binding is a sequence of them (`g g`). The table below holds
+//! every binding with its description; the view, the which-key popup and the help overlay all read
 //! it. Nothing here knows about widgets: the GTK crate turns key events into
 //! [`Key`] values and executes the [`Action`] a sequence resolves to.
 use std::fmt;
@@ -100,7 +99,7 @@ impl Key {
         }
     }
 
-    /// Parses Yazi's notation: a single character, or `<Mods-Name>` where the
+    /// Parses vim's notation: a single character, or `<Mods-Name>` where the
     /// modifiers are `C-`, `A-` and `S-` and the name is a character or one
     /// of the [`Named`] keys.
     pub fn parse(text: &str) -> Option<Self> {
@@ -227,7 +226,7 @@ pub enum SearchVia {
     Rg,
 }
 
-/// What a key sequence asks for. One variant per Yazi command and argument
+/// What a key sequence asks for. One variant per command and argument
 /// set that the default keymap uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(missing_docs)]
@@ -284,7 +283,7 @@ pub enum Action {
     Help,
 }
 
-/// A key sequence, what it does and Yazi's description of it.
+/// A key sequence, what it does and a description of it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Binding {
     /// The keys, in order.
@@ -296,7 +295,7 @@ pub struct Binding {
 }
 
 impl Binding {
-    /// The sequence in Yazi's notation, keys separated by spaces.
+    /// The sequence in vim's notation, keys separated by spaces.
     pub fn label(&self) -> String {
         self.keys
             .iter()
@@ -325,8 +324,8 @@ pub struct Keymap {
 
 use Action as A;
 
-/// Yazi 26.9 `[mgr]`, in its order.
-const YAZI: &[(&str, Action, &str)] = &[
+/// Every binding of the file view, in the order the key list shows them.
+const BINDINGS: &[(&str, Action, &str)] = &[
     (
         "<Esc>",
         A::Escape,
@@ -661,9 +660,9 @@ const YAZI: &[(&str, Action, &str)] = &[
 ];
 
 impl Keymap {
-    /// Yazi's default bindings for the file view.
-    pub fn yazi() -> Self {
-        let bindings = YAZI
+    /// The bindings of the file view.
+    pub fn standard() -> Self {
+        let bindings = BINDINGS
             .iter()
             .map(|(keys, action, desc)| Binding {
                 keys: keys
@@ -677,7 +676,7 @@ impl Keymap {
         Self { bindings }
     }
 
-    /// Every binding, in the order of Yazi's own table.
+    /// Every binding, in the order of the table.
     pub fn bindings(&self) -> &[Binding] {
         &self.bindings
     }
@@ -706,7 +705,7 @@ impl Keymap {
     }
 }
 
-/// Yazi's "smart" case: a query with an upper-case letter is matched as
+/// Vim's "smartcase": a query with an upper-case letter is matched as
 /// written, any other query without regard to case.
 pub fn smart_matches(name: &str, query: &str) -> bool {
     if query.is_empty() {
@@ -781,8 +780,8 @@ mod tests {
     }
 
     #[test]
-    fn the_table_is_yazi_s() {
-        let map = Keymap::yazi();
+    fn the_table_is_complete() {
+        let map = Keymap::standard();
         assert_eq!(map.bindings().len(), 116);
         let mut seen = HashSet::new();
         for binding in map.bindings() {
@@ -800,7 +799,7 @@ mod tests {
 
     #[test]
     fn sequences_resolve() {
-        let map = Keymap::yazi();
+        let map = Keymap::standard();
         let run = |pending: &[Key], next: &str| match map.feed(pending, key(next)) {
             Match::Run(binding) => Some(binding.action),
             _ => None,

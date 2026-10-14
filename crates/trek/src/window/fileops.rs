@@ -207,7 +207,7 @@ impl MainWindow {
     // ---- rename and create ----
 
     /// `r`: an input line holding the name, the text cursor before the
-    /// extension as Yazi's `rename --cursor=before_ext` puts it.
+    /// extension, ready to type a new name.
     pub(super) fn rename_selection(&self) {
         let selected = self.selected();
         let (Some(tab), [item]) = (self.active_tab(), selected.as_slice()) else {

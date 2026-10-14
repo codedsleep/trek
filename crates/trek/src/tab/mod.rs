@@ -185,7 +185,7 @@ impl TabPage {
         root.add_overlay(&empty);
         root.add_overlay(&error);
 
-        // Yazi's proportions: one part parent, four files, three preview.
+        // The proportions: one part parent, four files, three preview.
         // Hidden columns give their room to the others.
         let side_style = crate::view::Style {
             mode: ViewMode::Lines,

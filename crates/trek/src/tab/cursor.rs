@@ -1,6 +1,6 @@
 //! The cursor, visual mode and the find and filter commands.
 //!
-//! As in Yazi the cursor ("hovered" file) and the selection are separate
+//! The cursor ("hovered" file) and the selection are separate
 //! things. Moving the cursor selects nothing; a command acts on the selected
 //! files, or on the file under the cursor when none is selected.
 //!
@@ -162,8 +162,8 @@ impl TabPage {
         ((adjustment.page_size() / per_item).floor() as u32).max(1)
     }
 
-    /// `j`, `k`, `gg`, `G` and the page movements. Single steps wrap around,
-    /// as Yazi's `arrow prev` and `arrow next` do.
+    /// `j`, `k`, `gg`, `G` and the page movements. Single steps wrap around
+    /// from the last file to the first and back.
     pub fn arrow(&self, step: Step) {
         let count = self.0.model.visible_count() as u32;
         if count == 0 {

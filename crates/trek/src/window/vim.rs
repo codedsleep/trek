@@ -1,7 +1,7 @@
-//! What each key binding does: Yazi's commands, carried out by this file
-//! manager's own parts. The table of keys is `core::keymap`.
+//! What each key binding does: the vim motions' commands, carried out by
+//! this file manager's own parts. The table of keys is `core::keymap`.
 //!
-//! Where a command of Yazi's has no counterpart here it says so in the
+//! Where a binding has no counterpart here yet it says so in the
 //! status line; it never does something else under the same key.
 
 use super::{
@@ -151,8 +151,8 @@ impl MainWindow {
     }
 
     /// `y` and `x`: the files go on the clipboard, where other programs can
-    /// paste them too, and are marked until pasted or unyanked. Like Yazi
-    /// this leaves nothing selected.
+    /// paste them too, and are marked until pasted or unyanked. This
+    /// leaves nothing selected.
     fn yank(&self, tab: &TabPage, cut: bool) {
         let count = tab.targets().len();
         if count == 0 {
@@ -208,7 +208,7 @@ impl MainWindow {
         ));
     }
 
-    /// `,`: the sort order, with the linemode Yazi pairs with it.
+    /// `,`: the sort order, with the linemode that goes with it.
     fn sort_by(&self, tab: &TabPage, by: SortBy, reverse: bool) {
         let (column, linemode) = match by {
             SortBy::Mtime => (sort::Column::Modified, Some(Linemode::Mtime)),

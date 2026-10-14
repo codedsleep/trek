@@ -9,7 +9,7 @@
   padding: 3px 8px 3px 6px;
 }
 
-/* The mode, as Yazi shows it at the left of its status line. */
+/* The mode, as vim shows it at the left of its status line. */
 .mode-pill {
   padding: 0 8px;
   border-radius: 3px;

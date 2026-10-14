@@ -1,4 +1,4 @@
-# The Yazi key bindings of the file view, through real key presses. Run with:
+# The vim-motion key bindings of the file view, through real key presses. Run with:
 #   scripts/agent-run.sh -- ~/.cache/trek-fixture/names < scripts/agent/checks/vim.sh
 # Everything that changes files happens in a folder made here, inside the
 # allowed roots.

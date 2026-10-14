@@ -1,5 +1,5 @@
 //! The columns beside a tab's files: the parent folder on the left and the
-//! preview of what is under the cursor on the right, in Yazi's 1 : 4 : 3.
+//! preview of what is under the cursor on the right, in proportions of 1 : 4 : 3.
 
 use super::{TabPage, location_from_uri};
 use gtk::{gio, prelude::*};

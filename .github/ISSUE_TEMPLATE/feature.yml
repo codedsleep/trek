@@ -6,8 +6,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Before filing, check "What differs from Yazi" and "Differences from PCManFM" in the README.
-        trek keeps Yazi's keys and PCManFM's behaviour; a proposal that changes either should say why.
+        Before filing, check "Notes on the keys" and "Differences from PCManFM" in the README.
+        trek keeps vim motions and PCManFM's behaviour; a proposal that changes either should say why.
 
   - type: textarea
     id: problem
@@ -37,7 +37,7 @@ body:
       label: Where does this fit?
       multiple: true
       options:
-        - Keys / Yazi parity
+        - Keys / vim motions
         - Layout / columns / preview
         - Fuzzy finder
         - File operations

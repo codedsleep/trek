@@ -158,10 +158,10 @@ use Kind::{Index, Plain, Radio, Text, Toggle};
 
 /// Every window action.
 ///
-/// The keys of the file view are not here: they are Yazi's, in
+/// The keys of the file view are not here: they are the vim motions in
 /// `core::keymap`, and `window::keys` runs them. An accelerator in this
-/// table is a key Yazi leaves alone that a program with a window is expected
-/// to have — function keys, Ctrl+T, Alt+Left. None may also be a binding of
+/// table is a key the motions leave alone that a program with a window is
+/// expected to have — function keys, Ctrl+T, Alt+Left. None may also be a binding of
 /// the keymap; a test in `window::keys` holds that line. Accelerators are
 /// switched off while a text entry has the keyboard, so that every key
 /// typed there is the entry's.
@@ -224,7 +224,7 @@ pub const TABLE: &[Def] = &[
     def("fullscreen", Toggle, &["F11"], Cmd::Fullscreen),
     // §8.5: side pane, pane 1, pane 2. Not in any menu.
     def("focus-next-pane", Plain, &["F6"], Cmd::FocusNextPane),
-    // Ctrl+minus is Yazi's hard link, on the keypad too, so zooming out is on Alt.
+    // Ctrl+minus is the hard-link binding, on the keypad too, so zooming out is on Alt.
     def(
         "zoom-in",
         Plain,

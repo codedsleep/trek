@@ -89,7 +89,7 @@ impl App {
             seen_first_invocation: Cell::new(false),
             smoke: std::env::var_os("TREK_SMOKE").is_some_and(|v| v == "1"),
             exit_code: Cell::new(0),
-            keymap: trek_core::keymap::Keymap::yazi(),
+            keymap: trek_core::keymap::Keymap::standard(),
             accels_suspended: Cell::new(false),
         }));
         gtk::Window::set_default_icon_name(crate::dialogs::help::ICON);
