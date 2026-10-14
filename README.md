@@ -2,6 +2,8 @@
 
 **Elevator pitch:** A graphical file manager for Linux, in Rust and GTK 4, driven from the keyboard with vim motions — parent folder, files and preview side by side, `h` `j` `k` `l` to move, `y` `x` `p` to yank, cut and paste, `z` to fuzzy-find — while the mouse, drag and drop, menus, trash can, volumes and remote places all still work.
 
+![trek: parent folder, files and a preview of the file under the cursor](assets/screenshot.png)
+
 > **This build is locked.** Until its review is finished it changes files only
 > inside its test folders. Read [The safety lock](#the-safety-lock) before
 > pointing it at anything you care about.
