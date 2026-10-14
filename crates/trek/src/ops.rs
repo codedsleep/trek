@@ -26,9 +26,9 @@ pub fn display(uri: &str) -> String {
     location_from_uri(uri).map_or_else(|| uri.to_owned(), |location| location.display())
 }
 
-/// What to tell the user when the development guard refuses an operation
-/// (SCOPE 7.12). The engine's own text never reaches the dialog.
-pub fn locked_message(path: &str) -> String {
+/// What to tell the user when TREK_ALLOW_ROOTS confinement refuses an
+/// operation (SCOPE 7.12). The engine's own text never reaches the dialog.
+pub fn confined_message(path: &str) -> String {
     // The folders that exist among the allowed roots; the build and
     // temporary directories the guard also allows are of no use to a user.
     let hidden = [std::env::temp_dir()];
@@ -40,7 +40,7 @@ pub fn locked_message(path: &str) -> String {
         .map(|root| root.display().to_string())
         .collect();
     format!(
-        "This build of trek is locked: copying, moving, deleting, renaming and creating files only work inside its test folders until the review has been signed off.\n\nNot allowed here:\n{path}\n\nAllowed:\n{}\n\nTo try one more folder, such as a USB stick, start trek with TREK_ALLOW_ROOTS set to that folder.",
+        "TREK_ALLOW_ROOTS is set, so copying, moving, deleting, renaming and creating files only work inside the folders it allows.\n\nNot allowed here:\n{path}\n\nAllowed:\n{}\n\nStart trek without TREK_ALLOW_ROOTS to change files anywhere.",
         allowed.join("\n")
     )
 }
@@ -48,7 +48,7 @@ pub fn locked_message(path: &str) -> String {
 /// Message for a guard refusal.
 pub fn guard_message(error: &GuardError) -> String {
     match error {
-        GuardError::Denied(uri) => locked_message(&display(uri)),
+        GuardError::Denied(uri) => confined_message(&display(uri)),
         GuardError::Location(e) => e.to_string(),
         GuardError::Io(e) => format!("The location could not be checked: {e}."),
     }
@@ -57,9 +57,9 @@ pub fn guard_message(error: &GuardError) -> String {
 /// A job's error lines are the engine's strings; a guard refusal that only
 /// shows up mid-job is reworded here.
 fn tidy(error: &str) -> String {
-    match error.strip_prefix("File operations are locked outside the allowed roots: ") {
+    match error.strip_prefix("File operations are confined to the allowed roots: ") {
         Some(uri) => format!(
-            "{}: not allowed while this build is locked to its test folder.",
+            "{}: not allowed while TREK_ALLOW_ROOTS confines changes.",
             display(uri)
         ),
         None => error.to_owned(),
@@ -215,7 +215,7 @@ impl Running {
 /// Starts a job with its progress window and question dialogs. `done` runs
 /// on the main thread when the job has finished, whatever the outcome.
 ///
-/// The job is refused up front, with the locked-build explanation, when the
+/// The job is refused up front, with the confinement explanation, when the
 /// guard would refuse it.
 pub fn start(
     app: &App,

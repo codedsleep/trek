@@ -1,12 +1,13 @@
-//! Development write guard. Every mutating user-file entry point checks this policy.
+//! Write confinement. Every mutating user-file entry point checks this policy;
+//! it refuses only while TREK_ALLOW_ROOTS confines changes to named folders.
 use gio::prelude::*;
 use std::path::{Path, PathBuf};
 use trek_core::location::{Location, LocationError, normalize};
-/// A mutation is outside the allowed fixture/test roots.
+/// A mutation is outside the allowed roots.
 #[derive(Debug, thiserror::Error)]
 pub enum GuardError {
     /// Rejected location.
-    #[error("File operations are locked outside the allowed roots: {0}")]
+    #[error("File operations are confined to the allowed roots: {0}")]
     Denied(String),
     /// Malformed or prohibited URI.
     #[error(transparent)]
@@ -24,7 +25,7 @@ pub struct Policy {
     pub uri_roots: Vec<String>,
     /// User data directory; trash requires this to be under a root.
     pub data_home: PathBuf,
-    /// Owner-controlled release override. Agents never enable it.
+    /// No confinement: every location may be changed.
     pub unlocked: bool,
 }
 /// Resolve existing symlink ancestors, retaining the uncreated tail.
@@ -52,8 +53,11 @@ pub(crate) fn resolve(path: &Path) -> Result<PathBuf, std::io::Error> {
     }
 }
 impl Policy {
-    /// Build the locked policy from the fixture, build test root and temp directory.
-    /// TREK_ALLOW_ROOTS is a semicolon/newline-separated list of native paths or URIs.
+    /// Without TREK_ALLOW_ROOTS nothing is confined. With it, changes are
+    /// confined to the fixture, the build test root, the temp directory and
+    /// the roots it lists, a semicolon/newline-separated list of native paths
+    /// or URIs. The agent and dev scripts always set it, so their sessions
+    /// cannot change anything else.
     pub fn from_environment() -> Self {
         let mut roots = vec![
             glib::user_cache_dir().join("trek-fixture"),
@@ -77,8 +81,7 @@ impl Policy {
             roots,
             uri_roots,
             data_home: glib::user_data_dir(),
-            unlocked: std::env::var_os("TREK_UNLOCKED").as_deref()
-                == Some(std::ffi::OsStr::new("1")),
+            unlocked: std::env::var_os("TREK_ALLOW_ROOTS").is_none(),
         }
     }
     fn native_allowed(&self, path: &Path) -> Result<bool, GuardError> {
@@ -134,7 +137,7 @@ impl Policy {
         }
     }
 }
-/// Shared entry point used by all mutations; custom test policies stay locked too.
+/// Shared entry point used by all mutations; custom test policies stay confined too.
 pub fn check(file: &gio::File, policy: &Policy) -> Result<(), GuardError> {
     policy.check(file)
 }

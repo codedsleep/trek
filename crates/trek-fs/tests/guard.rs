@@ -61,10 +61,7 @@ fn every_mutating_entry_point_uses_guard() {
     for kind in kinds {
         let h = spawn_with_policy(kind, p.clone());
         let s = finish(&h, |q| panic!("Guard must fail before any question: {q:?}"));
-        assert!(
-            s.errors.iter().any(|e| e.contains("locked outside")),
-            "{s:?}"
-        );
+        assert!(s.errors.iter().any(|e| e.contains("confined to")), "{s:?}");
         assert_eq!(s.done_files, 0);
     }
     let mut p = p;
@@ -74,7 +71,7 @@ fn every_mutating_entry_point_uses_guard() {
         finish(&h, |_| Answer::Cancel)
             .errors
             .iter()
-            .any(|e| e.contains("locked outside"))
+            .any(|e| e.contains("confined to"))
     );
     let file = gio::File::for_uri(&outside);
     assert!(rename(&file, "x", &p).is_err());

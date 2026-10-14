@@ -10,9 +10,6 @@
 #
 # Without --set-default nothing about the desktop's defaults changes:
 # `xdg-mime query default inode/directory` answers as before.
-#
-# The build that is installed is still locked: it changes files only inside
-# its test folders and those named in TREK_ALLOW_ROOTS (see README.md).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 prefix="$HOME/.local"
@@ -23,7 +20,7 @@ while [[ $# -gt 0 ]]; do
         --set-default) set_default=1; shift ;;
         --uninstall) uninstall=1; shift ;;
         --prefix) prefix=${2:?--prefix needs a directory}; shift 2 ;;
-        -h | --help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h | --help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "install.sh: unknown option $1" >&2; exit 2 ;;
     esac
 done

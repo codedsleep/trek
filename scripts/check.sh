@@ -4,6 +4,8 @@ cd "$(dirname "$0")/.."
 if [[ -z ${RUSTFMT:-} && -x /usr/bin/rustfmt ]]; then export RUSTFMT=/usr/bin/rustfmt; fi
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
+# Confine the tests' file operations to the fixture and temporary folders.
+export TREK_ALLOW_ROOTS=${TREK_ALLOW_ROOTS-}
 G_DEBUG=fatal-criticals cargo test --workspace
 core_tree=$(cargo tree -p trek-core)
 fs_tree=$(cargo tree -p trek-fs)

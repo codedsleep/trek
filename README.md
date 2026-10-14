@@ -4,10 +4,6 @@
 
 ![trek: parent folder, files and a preview of the file under the cursor](assets/screenshot.png)
 
-> **This build is locked.** Until its review is finished it changes files only
-> inside its test folders. Read [The safety lock](#the-safety-lock) before
-> pointing it at anything you care about.
-
 ## Features
 
 - **Vim motions.** 116 bindings — `h` `j` `k` `l`, `gg` `G`, `Ctrl+U` `Ctrl+D`, `v` for visual mode, `y` `x` `p` to yank, cut and paste, `/` `n` `N` to find, and `g`, `m`, `c` and `,` to start a sequence — each with a description; `~` or `F1` lists them, and a started sequence lists its continuations at the bottom of the window.
@@ -30,7 +26,7 @@ Downloads the latest release, verifies its checksum and installs the binary, a l
 ```sh
 ... | sh -s -- --set-default        # also open folders with trek and answer "Show in folder"
 ... | sh -s -- --prefix /usr/local  # install somewhere else
-... | sh -s -- --version v0.1.0     # pin a release
+... | sh -s -- --version v1.0.0     # pin a release
 ... | sh -s -- --uninstall          # remove it again
 ```
 
@@ -143,39 +139,31 @@ GTK_THEME=Adwaita:light trek        # GTK's own light look for one run
 
 ### Environment
 
-| Variable           | Effect                                                          |
-| ------------------ | --------------------------------------------------------------- |
-| `TREK_ALLOW_ROOTS` | more folders the [safety lock](#the-safety-lock) lets it change |
-| `TREK_GTK_THEME`   | the GTK theme to take colours from, in place of the desktop's   |
-| `TREK_TRACE=1`     | print timings, memory and stall probes to the terminal          |
+| Variable           | Effect                                                        |
+| ------------------ | ------------------------------------------------------------- |
+| `TREK_ALLOW_ROOTS` | [confine](#confining-changes) changes to the folders it lists |
+| `TREK_GTK_THEME`   | the GTK theme to take colours from, in place of the desktop's |
+| `TREK_TRACE=1`     | print timings, memory and stall probes to the terminal        |
 
 A crash is written to `~/.local/state/trek/crash.log`.
 
-## The safety lock
+## Safety
 
-A file manager deletes things. Until its review has been signed off, every operation that changes files — copy, move, link, trash, delete, rename, create, changing permissions — is refused unless all of its sources and its destination lie inside:
+Two things to know about how trek changes files:
 
-- the test fixture, `~/.cache/trek-fixture`;
-- the system's temporary directory (`/tmp`) and the build's own `target/tmp`, which the tests use;
-- any folder named in `TREK_ALLOW_ROOTS` (`scripts/dev-run.sh` names its own data folder this way).
+- **Recursive operations follow paths, not open folders.** While trek is deleting or copying a folder tree, another program that swaps a folder in that tree for a symbolic link can redirect the rest of the operation. PCManFM and most file managers share this. Do not run a recursive delete in a folder that another user or an untrusted program can write to.
+- **A crash or kill in the middle of a copy** can leave a hidden file named `.trek-copy-…` beside the destination. It is safe to delete.
 
-Everywhere else trek browses, opens files and mounts volumes as usual, and tells you why when it refuses a change.
+### Confining changes
 
-To let it work in one more place, name it when starting — several are separated by semicolons, and a remote folder is given as a URI:
+To try trek where a slip would cost nothing, start it with `TREK_ALLOW_ROOTS`. While it is set, every operation that changes files — copy, move, link, trash, delete, rename, create, changing permissions — is refused unless all of its sources and its destination lie inside the folders it names, the test fixture `~/.cache/trek-fixture` or the temporary directory; trek says why when it refuses. Several folders are separated by semicolons, and a remote folder is given as a URI:
 
 ```sh
 TREK_ALLOW_ROOTS=/run/media/$USER/STICK trek
 TREK_ALLOW_ROOTS='/mnt/scratch;smb://nas/share/tmp' trek
 ```
 
-The trash can is only usable when trek's data folder is itself inside an allowed folder, as it is under `scripts/dev-run.sh`.
-
-**Unlocking.** The lock is not a setting. It is removed from the source when the review is signed off, and the release that follows (`v1.0.0`) has none. The code does have an override for that review, `TREK_UNLOCKED=1`, which switches every check off; using it before the sign-off means trusting an unreviewed copy and delete engine with your files.
-
-Two things the lock does not cover and the review will not change:
-
-- **Recursive operations follow paths, not open folders.** While trek is deleting or copying a folder tree, another program that swaps a folder in that tree for a symbolic link can redirect the rest of the operation. PCManFM and most file managers share this. Do not run a recursive delete in a folder that another user or an untrusted program can write to.
-- **A crash or kill in the middle of a copy** can leave a hidden file named `.trek-copy-…` beside the destination. It is safe to delete.
+While confined, the trash can is only usable when trek's data folder is itself inside an allowed folder. `scripts/dev-run.sh` and the headless checks always set it, so a development session cannot change anything outside its own folders.
 
 ## Hyprland and Wayland notes
 

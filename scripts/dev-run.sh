@@ -7,8 +7,8 @@
 #
 # With no arguments it opens the fixture, ~/.cache/trek-fixture.
 #
-# The build is locked: copy, move, delete, trash, rename and create only work
-# inside the fixture and the dev directories. To test a USB stick or one
+# Changes are confined: copy, move, delete, trash, rename and create only
+# work inside the fixture and the dev directories. To test a USB stick or one
 # scratch folder, name it first:
 #
 #   TREK_ALLOW_ROOTS=/run/media/$USER/STICK scripts/dev-run.sh
@@ -36,7 +36,6 @@ command -v dbus-run-session >/dev/null || { echo "dev-run.sh: dbus-run-session i
 if [[ $build == release ]]; then cargo build --release -p trek; else cargo build -p trek; fi
 "$root/scripts/mkfixture.sh" >/dev/null
 mkdir -p "$dev_home"/{config,cache,data,state}
-unset TREK_UNLOCKED
 if [[ -z ${TREK_GTK_THEME-} ]] && command -v gsettings >/dev/null; then
     theme=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null) || theme=
     theme=${theme#\'} theme=${theme%\'}

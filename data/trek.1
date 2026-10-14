@@ -1,4 +1,4 @@
-.TH TREK 1 "October 2026" "trek 0.1.0" "User Commands"
+.TH TREK 1 "October 2026" "trek 1.0.0" "User Commands"
 .SH NAME
 trek \- a graphical file manager driven with vim motions
 .SH SYNOPSIS
@@ -94,10 +94,12 @@ An option was not understood.
 The terminal emulator to use when none is set in Preferences.
 .TP
 .B TREK_ALLOW_ROOTS
-While the build is locked (see
-.BR "SAFETY LOCK" ),
-a semicolon-separated list of extra folders, as paths or URIs, in which
-files may be changed.
+When set, confines copying, moving, deleting, renaming and creating files
+to the folders it lists (a semicolon-separated list of paths or URIs),
+the test fixture
+.RI ( ~/.cache/trek\-fixture )
+and the temporary directory.
+Unset, files may be changed anywhere.
 .TP
 .B TREK_GTK_THEME
 The name of the GTK theme to follow, for a session that cannot tell which
@@ -120,15 +122,6 @@ Bookmarks, shared with GTK file choosers and other file managers.
 .TP
 .I ~/.cache/thumbnails
 Thumbnails, shared with other programs.
-.SH SAFETY LOCK
-This build is locked until its review is complete: copying, moving,
-deleting, renaming and creating files work only inside the test fixture
-.RI ( ~/.cache/trek\-fixture ),
-the temporary directory and the folders named in
-.BR TREK_ALLOW_ROOTS .
-Everywhere else
-.B trek
-browses and opens files but refuses to change them, and says so.
 .SH SEE ALSO
 .BR pcmanfm (1),
 .BR gio (1),

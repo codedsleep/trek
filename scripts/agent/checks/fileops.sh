@@ -1,7 +1,7 @@
 # File operations through the UI (SCOPE 7.2–7.9, 7.12). Run with:
 #   scripts/agent-run.sh -- ~/.cache/trek-fixture/names < scripts/agent/checks/fileops.sh
 # Everything happens in ~/.cache/trek-agent/work, inside the allowed roots,
-# except the locked-build check, which must change nothing outside them.
+# except the confinement check, which must change nothing outside them.
 W=$HOME/.cache/trek-agent/work
 outside=$HOME/.cache/trek-outside-test
 rm -rf "$W" "$outside"; mkdir -p "$W/sub" "$outside"
@@ -103,9 +103,9 @@ check "read-only folder: Create New is disabled" disabled create-folder
 check "read-only folder: Paste is disabled" disabled paste
 chmod 755 "$W/readonly"
 
-echo "--- the locked build refuses to write outside the allowed roots (task 7.12)"
+echo "--- confinement refuses to write outside the allowed roots (task 7.12)"
 act go-to "'$outside'"; settle 0.8
-act create-folder; settle 0.5; vin key Return; settle 1; shot locked
+act create-folder; settle 0.5; vin key Return; settle 1; shot confined
 check "nothing was created outside" test -z "$(ls -A "$outside")"
 vin key Return; settle 0.4; vin key Escape; settle 0.4
 rmdir "$outside"

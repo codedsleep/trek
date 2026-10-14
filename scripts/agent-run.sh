@@ -63,7 +63,7 @@ if [[ ${1:-} != --inside ]]; then
     [[ $keep == 1 ]] || rm -rf "$agent_home/config/trek/agent"
     driver="$out/driver.sh"
     if [[ -t 0 ]]; then : >"$driver"; else cat >"$driver"; fi
-    unset WAYLAND_DISPLAY DISPLAY HYPRLAND_INSTANCE_SIGNATURE TREK_UNLOCKED
+    unset WAYLAND_DISPLAY DISPLAY HYPRLAND_INSTANCE_SIGNATURE
     export XDG_CONFIG_HOME="$agent_home/config" XDG_CACHE_HOME="$agent_home/cache"
     export XDG_DATA_HOME="$agent_home/data" XDG_STATE_HOME="$agent_home/state"
     export TREK_ALLOW_ROOTS="$HOME/.cache/trek-fixture;$agent_home${TREK_ALLOW_ROOTS:+;$TREK_ALLOW_ROOTS}"
