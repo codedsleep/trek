@@ -25,7 +25,7 @@ pub fn about(parent: &gtk::Window) {
         })
         .comments(format!("A file manager driven by Yazi's keys.\n{CREDIT}."))
         .license_type(gtk::License::Gpl20)
-        .website("https://github.com/codedsleep/vim-centric-fm-rust")
+        .website("https://github.com/codedsleep/trek")
         .modal(true)
         .build();
     dialog.add_credit_section(

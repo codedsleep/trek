@@ -1,2 +1,5 @@
 /target/
 *.swp
+
+# Specification, decisions, plans and handoffs; kept locally, not published
+.planning/

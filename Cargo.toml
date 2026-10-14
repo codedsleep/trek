@@ -7,6 +7,7 @@ version = "0.1.0"
 edition = "2024"
 license = "GPL-2.0-or-later"
 rust-version = "1.92"
+repository = "https://github.com/codedsleep/trek"
 
 [workspace.dependencies]
 trek-core = { path = "crates/trek-core" }
