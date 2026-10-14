@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-fixture_root="${XDG_CACHE_HOME:-$HOME/.cache}/tallboy-fixture"
+fixture_root="${XDG_CACHE_HOME:-$HOME/.cache}/trek-fixture"
 if [[ ${1:-} == --clean ]]; then
     python3 - "$fixture_root" <<'PY'
 import pathlib, shutil, sys
 p=pathlib.Path(sys.argv[1])
-if p.name != 'tallboy-fixture' or p.is_symlink():
+if p.name != 'trek-fixture' or p.is_symlink():
     raise SystemExit('Refusing unexpected fixture path')
 if p.exists():
     for entry in p.rglob('*'):
@@ -19,7 +19,7 @@ fi
 python3 - "$fixture_root" <<'PY'
 import pathlib, os, subprocess, sys
 root=pathlib.Path(sys.argv[1])
-for name in ['big','deep','images','names','links','perm']: (root/name).mkdir(parents=True,exist_ok=True)
+for name in ['big','deep','empty','images','live','names','links','perm']: (root/name).mkdir(parents=True,exist_ok=True)
 def touch(path, data=b'fixture\n'):
     if not path.exists() and not path.is_symlink(): path.write_bytes(data)
 for i in range(50000): touch(root/'big'/f'file-{i:05d}.txt')
