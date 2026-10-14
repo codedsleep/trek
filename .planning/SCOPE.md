@@ -531,6 +531,36 @@ Agents append one line per choice made under §2 rule 4.
 - **Settled — R9:** headless `cage` + `grim` capture works, and `cage` accepts virtual keyboard and pointer input (task 5.2). No fallback was needed.
 - **Settled — O-4:** GIO copies clone btrfs extents; `filefrag -v` reports shared extents (Phase 3).
 
+### Latency pass (2026-10-14)
+
+Asked for by the owner after `scripts/agent/latency.sh` compared the application with the installed PCManFM (same headless session, release build, 3840×2160 at scale 1.5; the script reads frame commits out of each client's own `WAYLAND_DEBUG` log, so both are measured the same way from outside). Four changes, all of them in how a folder gets on screen:
+
+1. **A listing no longer asks for `standard::icon`.** That attribute makes GIO read the start of every file whose name leaves its type open, whichever content-type attribute is asked for beside it, so `defer_content_test` and the side columns' "cheap" listing saved nothing. Listings now go by name; the icon is derived from the type (and from a table for the home and XDG user folders, checked against GIO in `listed_user_folders_get_the_icons_gio_gives_them`). Files with an uncertain type are read after the listing and reported as `FolderEvent::Typed`; cells follow through the item's `gicon` and `description` properties. `FileItem::settle_type` reads a file at once when something is about to be decided by its type (open, Open With, preview, properties).
+2. **Listing runs on a worker thread** (`folder/load.rs`): enumeration, the filesystem queries and `FileMeta::from_info` happen there. The main loop appends chunks of at most 1,000 files and returns to idle priority between them.
+3. **The first batch waits for nothing on the main loop.** The filesystem queries that used to precede it were two round trips through a busy main loop; they are now two calls on the worker. The first batch is 64 files.
+4. **A folder is read once per tab** (`view/listing.rs`). A `Listing` owns load, monitor, items, filter and sort order, and moves between the three columns: `l` takes the preview's listing, `h` the parent's. A tab keeps the last 12 listings it showed (at most 100,000 files between them), each still watched; only watched, completely read listings are kept. `F5` reads from disk and forgets the kept ones. Throwing a large listing away frees its items a slice at a time at idle.
+
+Two things about GTK came out of the measuring and shaped the code: replacing a list model makes the view look every new item up among the rows it is dropping (26 ms for 50,000 items), so `FolderModel::adopt` drops the old rows first when that is cheaper; and a `ListView` keeps about 200 rows alive, so a column that goes through "empty" tears down and rebuilds 200 rows where a direct swap rebinds them. Side columns therefore lend their listing and keep their rows until they are told what to show next.
+
+| Item | Before | After |
+|---|---|---|
+| `/usr/bin`, 2,259 entries, backend (`fsls`) | 206–228 ms | 41 ms |
+| `/usr/bin` at start-up, load finished after `exec` (`bench.sh`) | 384–387 ms | 164.5 ms, median of 10 |
+| 50,000 entries, backend | 653 ms | 335 ms |
+| 50,000 entries, in-window, first visit: first batch painted / loaded and sorted / longest stall | 70–99 ms / 548–592 ms / 31–42 ms | 46 ms / 387 ms / 12 ms |
+| 50,000 entries, later visits: loaded and sorted | as the first | 12–34 ms |
+| `l` into `/usr/bin` from `/usr`: listing complete on screen | 180–270 ms (first rows 56–84 ms) | 51 ms |
+| `l` into the 50,000-file folder: listing complete | 620–680 ms (first rows 86–97 ms) | 44 ms |
+| `h` out of `/usr/bin`: files column / preview complete | 31–39 ms / about 300 ms | 33 ms / 70–90 ms |
+| `h` out of the 50,000-file folder: files column / preview complete | 46–65 ms / 740–930 ms | 33 ms / 60–75 ms |
+| `h` out of a 30-file folder: first frame | 11.7 ms | 9.2 ms |
+| Cursor step (`j`), first frame, median | 4.0 ms | 4.0 ms |
+| Memory per 10,000 files | 10.3 MiB | 10.0 MiB |
+
+What the table does not say: the first frame after `l` used to be the emptied column, 20–30 ms after the key; it is now the finished one and comes later than that empty frame did (51 ms into `/usr/bin`). Of that, about half is GTK building the 190 rows a small column did not have, and half the frame itself. Kept listings cost memory while the tab lives: up to the 100,000-file limit, about 100 MiB. The preview of a kept folder is deliberately shown after the files column, not with it, so that building its rows does not hold back the frame that answers the key. `nav.*` "last frame" figures of two or three seconds in the script's table are frames that begin two seconds after a column's content changed and carry none of the application's work; most likely the overlay scrollbar fading, which was not confirmed. Figures are from the headless session, not the owner's GPU session.
+
+Checked with `scripts/check.sh` and all 17 scripts of `scripts/agent/checks/run-all.sh` (361 assertions); `leaks.sh` gained a `live_listings` counter that must return to zero with the tabs.
+
 ---
 
 ## 13. Implementation log
@@ -556,3 +586,5 @@ One entry per completed phase: date, agent, commit range, what was verified by t
 - 2026-10-13 — Claude, Phase 9, `cf128fb` through the phase-completion commit. **By test** (`check.sh` green): `preferences_pages_are_one_based` and the adjusted `invalid`, with every earlier suite. **By agent** (`scripts/agent/checks/run-all.sh`: 14 scripts, 200 assertions, all PASS): thumbnails at scale 1.5 with stall figures from a release build, dual pane, leak counters back to zero, Preferences by keyboard on every page, the importer against a copy of the owner's settings in the isolated profile, `FileManager1` over the private bus, the installer in a scratch prefix, the desktop file and man page validators, the README's differences list generated from §10. **X11:** navigation, file operations, menus and dual pane pass under XWayland; modifier keys during an X11 drag could not be checked because the headless compositor crashes (QA.md). **By hand:** owner checkpoint 5 is open; nothing was installed into the owner's `~/.local` and no default was changed. Backend patch: `--show-pref` pages 1–5 (`abd0c6d`). A leak found by the new counter and fixed: directory-tree rows kept their folder monitor after being collapsed.
 
 - 2026-10-13 — Codex, Phase 10 review/hardening, `c49ce0e` through the handoff-record commit: ten fixes with regression coverage; all ten HANDOFF-B patches audited; GTK lifetimes, every UI job launch, and all 26 security items reviewed. Final fmt/clippy/workspace/layering/harness/headless smoke/tree tests and warning-free cargo doc pass; actual private-GVFS trash run passes. Baseline 14-script UI run passed 200 functional assertions and exposed one toolkit warning; corrected Properties/drag/tree/menu-session runs passed 56 assertions with no warnings and counters zero. Menu/submenu, emblem and fresh scale-1.5 thumbnail screenshots inspected. Release benchmarks and misses recorded in §11. README has all 27 deviations in identical order/text. Owner live-session QA remains unchecked; 10.10 is pending sign-off.
+
+- 2026-10-14 — Claude, latency pass (owner request; §11 "Latency pass"). **By test** (`check.sh` green): `a_listing_goes_by_name_and_reads_only_what_the_name_leaves_open`, `listed_user_folders_get_the_icons_gio_gives_them`, the folder tests adjusted for `FolderEvent::Typed`. **By agent**: `run-all.sh`, 17 scripts, 361 assertions, all PASS; `latency.sh` and `bench.sh` for the figures; screenshots of `/usr` ↔ `/usr/bin` reviewed for icons, the parent's mark and the cursor returning to the folder left. `opening.sh` no longer builds its unknown-type file from random bytes, which had once sniffed as `text/x-matlab`. **Not done by hand:** the feel on the owner's GPU session.

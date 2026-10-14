@@ -122,6 +122,14 @@ is `/` now.
   an image, and gives anything else a card with its type, size, date and
   permissions. Only local files are read. `F7` and `F8` hide a column; in
   dual-pane mode both are hidden.
+- **A folder is read once.** Entering a folder moves the listing the preview
+  was showing into the files column, and the one the files column was showing
+  into the parent column; `h` moves them back. A tab also keeps the last
+  dozen folders it has shown, each still watched for changes, so going back
+  to one reads nothing. `F5` (Reload Folder) reads the folder from disk whatever
+  is kept. A folder is listed by its names, on a thread of its own; files
+  whose name does not say what they are (a script without an extension) are
+  read just afterwards and their icons follow.
 - **The line view**, one file per row with the linemode at the right, is the
   default. The icon, compact, thumbnail and detailed-list views are still
   there (`Ctrl+2`…`Ctrl+5`); they draw the cursor as a frame.

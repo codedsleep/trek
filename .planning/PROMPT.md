@@ -226,6 +226,8 @@ pub enum Location {
 
 Define the attribute query string once, as a constant, in `meta.rs`. With `defer_content_test=1` request `standard::fast-content-type` instead of `standard::content-type`.
 
+*Revised 2026-10-14 (SCOPE §11, latency pass):* a folder listing always asks for `standard::fast-content-type` and, for local files, not for `standard::icon`, which makes GIO read every file its name does not settle whichever content-type attribute stands beside it; the icon is derived from the type. Files listed with an uncertain type carry `type_uncertain` and are read after the listing (`FolderEvent::Typed`). `defer_content_test=1` now means that this second pass is skipped and a file is only read when it is opened, previewed or asked about. Single-file queries (`meta::attributes`) are unchanged.
+
 ### 7.3 Folder pipeline
 
 ```
