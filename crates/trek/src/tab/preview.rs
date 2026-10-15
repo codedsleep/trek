@@ -1,7 +1,7 @@
 //! The preview column: what is under the cursor, shown without opening it.
 //!
-//! A folder is listed, a text file shows its first lines, an image is drawn,
-//! anything else gets a card with what the listing already knows about it.
+//! A folder is listed, a text file shows its first lines, numbered and
+//! coloured as bat would colour them, an image is drawn, anything else gets a card with what the listing already knows about it.
 //! Only local files are read; nothing is mounted, asked for or executed, and
 //! a file that is not a regular file is never opened at all.
 //!
@@ -20,7 +20,7 @@ use std::{
     rc::Rc,
     time::Duration,
 };
-use trek_core::{format, sort::SortSpec};
+use trek_core::{format, highlight, sort::SortSpec};
 use trek_fs::{folder::Options, meta::FileMeta};
 
 /// How long the cursor rests on a file before it is previewed.
@@ -88,6 +88,33 @@ fn decode(path: &std::path::Path) -> Option<Pixels> {
     })
 }
 
+/// What the text page shows: line numbers, and the text as plain text or,
+/// when a grammar knows the file, as markup.
+struct Shown {
+    gutter: String,
+    text: String,
+    markup: Option<String>,
+}
+
+/// The first lines of the file called `name`, highlighted for a dark or a
+/// light background, or `None` when it is not text. Runs on a worker thread.
+fn shown(name: &str, bytes: &[u8], dark: bool) -> Option<Shown> {
+    let mut text = text_of(bytes)?;
+    // Every line ends in a newline; the last one would show as one more line.
+    text.pop();
+    Some(Shown {
+        gutter: highlight::gutter(text.split('\n').count()),
+        markup: highlight::markup(name, &text, dark),
+        text,
+    })
+}
+
+/// Whether `widget`'s text is light, that is, its background dark.
+fn on_dark(widget: &impl IsA<gtk::Widget>) -> bool {
+    let color = widget.color();
+    0.2126 * color.red() + 0.7152 * color.green() + 0.0722 * color.blue() > 0.5
+}
+
 /// The first lines of `bytes` as text, or `None` when it is not text.
 fn text_of(bytes: &[u8]) -> Option<String> {
     if bytes.contains(&0) {
@@ -106,6 +133,7 @@ fn text_of(bytes: &[u8]) -> Option<String> {
 struct Inner {
     stack: gtk::Stack,
     folder: MiniColumn,
+    gutter: gtk::Label,
     text: gtk::Label,
     text_scroller: gtk::ScrolledWindow,
     picture: gtk::Picture,
@@ -126,12 +154,25 @@ pub struct Preview(Rc<Inner>);
 impl Preview {
     pub fn new(style: Style, sort: SortSpec, show_hidden: bool, cache: Rc<ListingCache>) -> Self {
         let folder = MiniColumn::new(style, sort, show_hidden, cache, false);
+        // The grammars load once, away from the first preview.
+        static WARM_UP: std::sync::Once = std::sync::Once::new();
+        WARM_UP.call_once(|| {
+            std::thread::spawn(highlight::warm_up);
+        });
+        let gutter = gtk::Label::new(None);
+        gutter.set_xalign(1.0);
+        gutter.set_yalign(0.0);
+        gutter.add_css_class("preview-gutter");
         let text = gtk::Label::new(None);
         text.set_xalign(0.0);
         text.set_yalign(0.0);
+        text.set_hexpand(true);
         text.add_css_class("preview-text");
+        let lines = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        lines.append(&gutter);
+        lines.append(&text);
         let text_scroller = gtk::ScrolledWindow::new();
-        text_scroller.set_child(Some(&text));
+        text_scroller.set_child(Some(&lines));
         let picture = gtk::Picture::new();
         picture.set_can_shrink(true);
         picture.set_content_fit(gtk::ContentFit::ScaleDown);
@@ -172,6 +213,7 @@ impl Preview {
         Self(Rc::new(Inner {
             stack,
             folder,
+            gutter,
             text,
             text_scroller,
             picture,
@@ -219,6 +261,7 @@ impl Preview {
         inner.folder.clear();
         inner.picture.set_paintable(gdk::Paintable::NONE);
         inner.text.set_text("");
+        inner.gutter.set_text("");
         inner.stack.set_visible_child_name(EMPTY);
     }
 
@@ -336,6 +379,8 @@ impl Preview {
                 }
             });
         } else if is_text(&meta.content_type) && meta.size > 0 {
+            let name = meta.name.to_string_lossy().into_owned();
+            let dark = on_dark(&inner.text);
             let weak = Rc::downgrade(&self.0);
             glib::spawn_future_local(async move {
                 let bytes = async {
@@ -346,12 +391,18 @@ impl Preview {
                         .ok()
                 }
                 .await;
+                let Some(bytes) = bytes else { return };
+                let shown = gio::spawn_blocking(move || shown(&name, &bytes, dark)).await;
                 let Some(inner) = weak.upgrade() else { return };
                 if inner.generation.get() != generation {
                     return;
                 }
-                if let Some(text) = bytes.as_deref().and_then(text_of) {
-                    inner.text.set_text(&text);
+                if let Ok(Some(shown)) = shown {
+                    match &shown.markup {
+                        Some(markup) => inner.text.set_markup(markup),
+                        None => inner.text.set_text(&shown.text),
+                    }
+                    inner.gutter.set_text(&shown.gutter);
                     inner.text_scroller.vadjustment().set_value(0.0);
                     inner.text_scroller.hadjustment().set_value(0.0);
                     inner.stack.set_visible_child_name(TEXT);
@@ -421,5 +472,16 @@ mod tests {
         );
         // Bytes that are not UTF-8 are shown as best they can be.
         assert!(text_of(b"caf\xe9\n").is_some());
+    }
+
+    #[test]
+    fn every_line_shown_has_a_number() {
+        let plain = shown("notes.txt", b"one\n\nthree\n", true).expect("text");
+        assert_eq!(plain.text, "one\n\nthree");
+        assert_eq!(plain.gutter, "1\n2\n3");
+        assert!(plain.markup.is_none());
+        let code = shown("main.rs", b"fn main() {}", false).expect("text");
+        assert_eq!(code.gutter, "1");
+        assert!(code.markup.is_some());
     }
 }

@@ -8,6 +8,7 @@ pub mod enable;
 pub mod format;
 pub mod glob;
 pub mod helpers;
+pub mod highlight;
 pub mod history;
 pub mod invocation;
 pub mod keymap;
