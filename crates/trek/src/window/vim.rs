@@ -119,6 +119,7 @@ impl MainWindow {
                 self.go_to(Location::from_path(&downloads).ok());
             }
             Action::GoTrash => self.go_to(location_from_uri("trash:///")),
+            Action::GoDevices => self.show_devices(),
             Action::GoInteractive => inner.path_bar.focus_entry(),
             Action::Follow => self.follow_link(&tab),
             Action::TabCreate => {

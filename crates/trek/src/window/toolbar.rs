@@ -113,6 +113,11 @@ impl Toolbar {
         &self.history
     }
 
+    /// Puts the devices button just before the menu button.
+    pub fn set_devices(&self, devices: &impl IsA<gtk::Widget>) {
+        self.root.insert_child_after(devices, Some(&self.path_slot));
+    }
+
     /// Puts the path bar in its place between Home and Go.
     pub fn set_path_bar(&self, path_bar: &impl IsA<gtk::Widget>) {
         self.path_slot.append(path_bar);

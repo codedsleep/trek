@@ -6,10 +6,11 @@
 
 ## Features
 
-- **Vim motions.** 116 bindings — `h` `j` `k` `l`, `gg` `G`, `Ctrl+U` `Ctrl+D`, `v` for visual mode, `y` `x` `p` to yank, cut and paste, `/` `n` `N` to find, and `g`, `m`, `c` and `,` to start a sequence — each with a description; `~` or `F1` lists them, and a started sequence lists its continuations at the bottom of the window.
+- **Vim motions.** 117 bindings — `h` `j` `k` `l`, `gg` `G`, `Ctrl+U` `Ctrl+D`, `v` for visual mode, `y` `x` `p` to yank, cut and paste, `/` `n` `N` to find, and `g`, `m`, `c` and `,` to start a sequence — each with a description; `~` or `F1` lists them, and a started sequence lists its continuations at the bottom of the window.
 - **Three columns.** Parent folder, files and a preview that lists a folder, shows the start of a text file, draws an image, and gives anything else a card with its type, size, date and permissions.
 - **Fuzzy finder.** `z` lists everything below the folder and matches as you type with fzf's query syntax, on all cores, honouring `.gitignore`. No fzf needed.
 - **Fast folders.** A folder is listed on a thread of its own, read once, and handed between columns as you move; a tab keeps the last dozen folders it showed, still watched for changes.
+- **Drives and media.** A USB stick is mounted when you plug it in, as in PCManFM, and asked about with the same "Removable medium is inserted" dialog. Its name appears as a button in the toolbar, lit until you look; `g m` lists every drive with its mount point — `Enter` opens one, `e` ejects it — and the status line says when something is connected, mounted, unmounted or safe to unplug.
 - **Text files in your editor.** `$VISUAL`, `$EDITOR` or nvim, in a terminal; default applications and Open With for the rest.
 - **Everything PCManFM does.** Tabs, dual pane, a side pane with places or a directory tree, five views, copy/move/trash with a progress window and conflict questions, volumes, Connect to Server through GVFS, Properties, Preferences, thumbnails.
 - **Your GTK theme.** Dark, in the colours of the desktop's theme — including GTK 3-only themes, whose palette is carried over onto GTK 4's stylesheet.
@@ -208,6 +209,7 @@ Keys and layout are trek's own, as described above. Everything else that is not 
 26. Recursive permission changes prepare the tree and visit children before parents; an inaccessible subtree cannot be repaired by granting access recursively
 27. A listing error after an initial batch leaves the partial view in Loading; partial-result error presentation awaits an owner decision
 28. Text files open in the editor (`$VISUAL`, then `$EDITOR`, then `nvim`) in the terminal, whatever application is set for their type; that includes executable scripts, which are no longer offered for execution unless `quick_exec=1`. Pictures written in XML (SVG) keep their applications. An application with `Terminal=true` is started in trek's terminal, not one from GIO's list
+29. Media are automounted whenever GIO's volume monitor marks them for automounting, not only when the drive reports itself removable, so disk images you attach count too. A medium with no recognised content still gets the autorun dialog, as "Removable Disk" with only "Open in File Manager" and nothing to remember
 
 ## Development
 

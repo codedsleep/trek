@@ -272,6 +272,7 @@ pub enum Action {
     GoConfig,
     GoDownloads,
     GoTrash,
+    GoDevices,
     GoInteractive,
     Follow,
     TabCreate,
@@ -634,6 +635,7 @@ const BINDINGS: &[(&str, Action, &str)] = &[
     ("g c", A::GoConfig, "Go to ~/.config"),
     ("g d", A::GoDownloads, "Go to ~/Downloads"),
     ("g t", A::GoTrash, "Go to trash bin"),
+    ("g m", A::GoDevices, "List drives and media"),
     ("g <Space>", A::GoInteractive, "Jump interactively"),
     ("g f", A::Follow, "Follow hovered symlink"),
     // Tabs
@@ -782,7 +784,7 @@ mod tests {
     #[test]
     fn the_table_is_complete() {
         let map = Keymap::standard();
-        assert_eq!(map.bindings().len(), 116);
+        assert_eq!(map.bindings().len(), 117);
         let mut seen = HashSet::new();
         for binding in map.bindings() {
             assert!(seen.insert(binding.keys.clone()), "{}", binding.label());
@@ -822,7 +824,7 @@ mod tests {
                 let labels: Vec<String> = next.iter().map(|b| b.label()).collect();
                 assert_eq!(
                     labels,
-                    ["g g", "g h", "g c", "g d", "g t", "g <Space>", "g f"]
+                    ["g g", "g h", "g c", "g d", "g t", "g m", "g <Space>", "g f"]
                 );
             }
             other => panic!("{other:?}"),

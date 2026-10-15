@@ -79,3 +79,24 @@ fn mount_locations_and_busy_error() {
     assert!(e.0.matches(gio::IOErrorEnum::Busy));
     assert!(e.to_string().contains("busy"));
 }
+
+#[test]
+fn automount_follows_the_backend_hint() {
+    let c = Config::default();
+    // A disk image the user attached: no drive, so neither removable nor
+    // internal, and udisks asks for it to be mounted.
+    let image = Entry {
+        removable: false,
+        can_eject: false,
+        ..entry()
+    };
+    assert_eq!(
+        autorun::automount_plan(std::slice::from_ref(&image), &c, false),
+        vec!["usb"]
+    );
+    let held_back = Entry {
+        should_automount: false,
+        ..image
+    };
+    assert!(autorun::automount_plan(&[held_back], &c, false).is_empty());
+}

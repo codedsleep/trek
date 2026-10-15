@@ -12,18 +12,22 @@ pub struct Choice {
     pub remember: bool,
 }
 
-/// Shows the dialog for a medium of `content_type`. `may_remember` is false
-/// for media that must always ask (DISCOVERY D15).
+/// Shows the dialog for a medium of `content_type`, or of no particular
+/// type. `may_remember` is false for media that must always ask
+/// (DISCOVERY D15).
 pub fn show(
     parent: Option<&gtk::Window>,
     medium: &str,
-    content_type: &str,
+    content_type: Option<&str>,
     apps: Vec<gio::AppInfo>,
     may_remember: bool,
     chosen: impl Fn(Choice) + 'static,
 ) {
     let dialog = Dialog::new(parent, "Removable medium is inserted");
-    let description = gio::content_type_get_description(content_type);
+    let description = content_type.map_or_else(
+        || "Removable Disk".to_owned(),
+        |content_type| gio::content_type_get_description(content_type).to_string(),
+    );
     dialog.content().append(&caption(&format!(
         "Removable medium is inserted: {medium}\nType of medium: {description}\n\nPlease select the action you want to perform:"
     )));

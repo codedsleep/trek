@@ -3,7 +3,9 @@ use super::Entry;
 use gio::prelude::*;
 use trek_core::config::{AutorunChoice, Config};
 /// Volume ids eligible for startup or newly-added-volume automatic mounting.
-/// Internal disks and volumes that the backend excludes from automount are untouched.
+/// The backend's automount hint decides, as in PCManFM: udisks gives it to
+/// media on hot-plug buses (USB, FireWire, SD) and to disk images the user
+/// attached, never to fixed disks. Internal disks are skipped regardless.
 pub fn automount_plan(entries: &[Entry], config: &Config, startup: bool) -> Vec<String> {
     entries
         .iter()
@@ -15,7 +17,7 @@ pub fn automount_plan(entries: &[Entry], config: &Config, startup: bool) -> Vec<
                 && (if startup {
                     config.mount_on_startup
                 } else {
-                    config.mount_removable && e.removable
+                    config.mount_removable
                 })
         })
         .map(|e| e.id.clone())

@@ -213,6 +213,14 @@ impl App {
         self.0.automounted.borrow_mut().remove(id)
     }
 
+    /// Tells every window what happened to a drive or medium.
+    pub fn volume_event(&self, text: &str, mounted: bool) {
+        let windows = self.0.windows.borrow().clone();
+        for window in windows {
+            window.volume_event(text, mounted);
+        }
+    }
+
     /// A mount went away: tabs inside it close or go Home (§8.17).
     pub fn mount_gone(&self, root: &gio::File) {
         let windows = self.0.windows.borrow().clone();

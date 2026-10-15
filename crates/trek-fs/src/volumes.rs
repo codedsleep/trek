@@ -21,7 +21,8 @@ pub struct Entry {
     pub mounted: bool,
     /// Removable drive/media.
     pub removable: bool,
-    /// Internal fixed disk.
+    /// On a fixed drive. A volume without a drive (a loop device, a
+    /// disk image) is not internal, as in PCManFM's Places.
     pub internal: bool,
     /// Eject is supported.
     pub can_eject: bool,
@@ -73,7 +74,7 @@ fn volume_entry(v: &gio::Volume) -> Entry {
         device: device.clone(),
         mounted: mount.is_some(),
         removable,
-        internal: device.is_some() && !removable,
+        internal: drive.is_some() && !removable,
         can_eject: v.can_eject() || mount.as_ref().is_some_and(|m| m.can_eject()),
         can_mount: v.can_mount(),
         should_automount: v.should_automount(),

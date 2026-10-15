@@ -61,6 +61,22 @@ impl MainWindow {
         }
     }
 
+    /// Something happened to a drive or medium: say so in the status line,
+    /// and when one was mounted make the devices button stand out.
+    pub fn volume_event(&self, text: &str, mounted: bool) {
+        self.notice(text);
+        if mounted {
+            self.0.devices.attention();
+        }
+    }
+
+    /// `g m`: the list of devices, or a word on why there is none.
+    pub(super) fn show_devices(&self) {
+        if !self.0.devices.popup() {
+            self.notice("No removable drives or mounts");
+        }
+    }
+
     /// A mount went away. Tabs inside it close when `close_on_unmount` is
     /// set, otherwise they go Home (§8.17).
     pub fn mount_gone(&self, root: &gio::File) {

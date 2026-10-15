@@ -1,6 +1,7 @@
 //! The main window: menu bar, side pane, folder area and status bar.
 
 mod commands;
+mod devices;
 mod fileops;
 mod finder;
 mod keys;
@@ -21,6 +22,8 @@ use crate::{
     settings::{self, HandlerId, Key},
     tab::{Change, LoadState, TabPage},
 };
+use devices::Devices;
+pub use devices::place as device_place;
 use gtk::{glib, prelude::*};
 use pane::{Pane, PaneEvent};
 use pathbar::{PathBar, PathEvent};
@@ -49,6 +52,10 @@ struct Inner {
     /// Holds the panes side by side.
     split: gtk::Paned,
     status: StatusBar,
+    /// Removable media and mounts, in the toolbar.
+    devices: Devices,
+    /// The window's subscription to volume and bookmark changes.
+    places_listener: Cell<u64>,
     /// The continuations of a started key sequence.
     which_key: prompt::WhichKey,
     /// The one-line input over the folder area.
@@ -160,6 +167,17 @@ impl MainWindow {
             }
         });
         toolbar.set_path_bar(path_bar.widget());
+        let devices = Devices::new({
+            let slot = slot.clone();
+            move |request| {
+                let window = slot.borrow().as_ref().and_then(WeakWindow::upgrade);
+                if let Some(window) = window {
+                    window.place_request(request);
+                }
+            }
+        });
+        devices.set(app.volumes().snapshot());
+        toolbar.set_devices(devices.widget());
         toolbar
             .menu_button()
             .set_menu_model(app.gtk().menubar().as_ref());
@@ -195,6 +213,8 @@ impl MainWindow {
             active: Cell::new(0),
             split,
             status,
+            devices,
+            places_listener: Cell::new(0),
             which_key,
             input,
             confirm,
@@ -315,6 +335,15 @@ impl MainWindow {
         let first = inner.panes.borrow()[0].clone();
         self.attach_pane(&first);
 
+        let weak = self.downgrade();
+        inner
+            .places_listener
+            .set(inner.app.places_changed().connect(move || {
+                if let Some(window) = weak.upgrade() {
+                    window.0.devices.set(window.0.app.volumes().snapshot());
+                }
+            }));
+
         // The history menu is built when it is opened.
         let weak = self.downgrade();
         inner
@@ -391,6 +420,10 @@ impl MainWindow {
         self.remember_geometry();
         let settings = self.0.app.settings();
         settings.disconnect(&self.0.settings_handlers.take());
+        self.0
+            .app
+            .places_changed()
+            .disconnect(self.0.places_listener.get());
         if let Some((clipboard, handler)) = self.0.clipboard_handler.take() {
             clipboard.disconnect(handler);
         }

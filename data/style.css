@@ -30,6 +30,24 @@
   font-weight: bold;
 }
 
+/* The devices button, after a medium was mounted and until it is opened. */
+.devices.attention {
+  background: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
+}
+
+.devices-list {
+  min-width: 320px;
+}
+
+.device-row {
+  padding: 4px 2px;
+}
+
+.device-name {
+  font-weight: bold;
+}
+
 .status-pending {
   padding: 0 6px;
   border-radius: 3px;

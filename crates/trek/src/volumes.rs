@@ -103,7 +103,13 @@ pub fn unmount(app: &App, parent: Option<&gtk::Window>, id: &str) {
 pub fn eject(app: &App, parent: Option<&gtk::Window>, id: &str) {
     let mounted = app.volumes().mounted(id);
     let volume = app.volumes().volume(id);
-    let parent = parent.cloned();
+    let name = app
+        .volumes()
+        .inventory()
+        .into_iter()
+        .find(|entry| entry.id == id)
+        .map(|entry| entry.name);
+    let (app, parent) = (app.clone(), parent.cloned());
     glib::spawn_future_local(async move {
         let operation = operation(parent.as_ref());
         let result = match (mounted, volume) {
@@ -111,8 +117,13 @@ pub fn eject(app: &App, parent: Option<&gtk::Window>, id: &str) {
             (None, Some(volume)) => volumes::eject_volume(&volume, &operation).await,
             (None, None) => return,
         };
-        if let Err(e) = result {
-            report(parent.as_ref(), "The medium could not be ejected", &e);
+        match result {
+            Ok(()) => {
+                if let Some(name) = name {
+                    app.volume_event(&format!("“{name}” ejected — safe to unplug"), false);
+                }
+            }
+            Err(e) => report(parent.as_ref(), "The medium could not be ejected", &e),
         }
     });
 }
@@ -126,7 +137,8 @@ pub fn startup(app: &App) {
 }
 
 /// Reacts to a change of the inventory: automounts newly inserted media,
-/// offers autorun for what it mounted, and tells windows about lost mounts.
+/// offers autorun for what it mounted, tells windows about lost mounts, and
+/// says in the status line what happened to drives that are not fixed disks.
 pub fn changed(app: &App, before: &[Entry], after: &[Entry]) {
     let config = app.settings().config();
     let old = |id: &str| before.iter().find(|entry| entry.id == id);
@@ -136,13 +148,31 @@ pub fn changed(app: &App, before: &[Entry], after: &[Entry]) {
         .filter(|entry| old(&entry.id).is_none())
         .cloned()
         .collect();
-    for id in autorun::automount_plan(&inserted, &config, false) {
+    let plan = autorun::automount_plan(&inserted, &config, false);
+    for entry in inserted
+        .iter()
+        .filter(|entry| !entry.internal && !entry.mounted)
+    {
+        if plan.contains(&entry.id) {
+            app.volume_event(&format!("“{}” connected — mounting…", entry.name), false);
+        } else {
+            announce_unmounted(app, entry);
+        }
+    }
+    for id in plan {
         app.note_automount(&id);
         mount(app, None, &id, |_| {});
     }
 
     for entry in after.iter().filter(|entry| entry.mounted) {
         let newly = old(&entry.id).is_none_or(|was| !was.mounted);
+        if newly && !entry.internal {
+            let place = crate::window::device_place(entry).unwrap_or_default();
+            app.volume_event(
+                &format!("“{}” mounted at {place} — g m to open it", entry.name),
+                true,
+            );
+        }
         // Autorun only follows a mount we made for inserted media (§8.17).
         if newly && app.take_automount(&entry.id) && autorun::prompt_enabled(&config) {
             offer_autorun(app, entry.clone());
@@ -150,13 +180,35 @@ pub fn changed(app: &App, before: &[Entry], after: &[Entry]) {
     }
 
     for gone in before.iter().filter(|entry| entry.mounted) {
-        let still = after
-            .iter()
-            .any(|entry| entry.id == gone.id && entry.mounted);
-        if !still && let Some(root) = &gone.root {
+        let now = after.iter().find(|entry| entry.id == gone.id);
+        if now.is_some_and(|entry| entry.mounted) {
+            continue;
+        }
+        if let Some(root) = &gone.root {
             app.mount_gone(&gio::File::for_uri(root));
         }
+        if now.is_some() && !gone.internal {
+            app.volume_event(&format!("“{}” unmounted", gone.name), false);
+        }
     }
+}
+
+/// Points out an inserted volume that was left unmounted. A device being
+/// torn down shows up for a moment as a nameless "Volume"; only one that is
+/// still there a second later is worth a word.
+fn announce_unmounted(app: &App, entry: &Entry) {
+    let (weak, id, name) = (app.downgrade(), entry.id.clone(), entry.name.clone());
+    glib::timeout_add_local_once(std::time::Duration::from_secs(1), move || {
+        let Some(app) = weak.upgrade() else { return };
+        let waiting = app
+            .volumes()
+            .inventory()
+            .iter()
+            .any(|entry| entry.id == id && !entry.mounted);
+        if waiting {
+            app.volume_event(&format!("“{name}” connected — g m to mount it"), false);
+        }
+    });
 }
 
 fn open_in_file_manager(app: &App, root: Location) {
@@ -193,26 +245,35 @@ fn offer_autorun(app: &App, entry: Entry) {
     let app = app.clone();
     glib::spawn_future_local(async move {
         let types = autorun::content_types(&mount).await.unwrap_or_default();
-        let Some(content_type) = types.into_iter().next() else {
-            return;
-        };
+        // Plain storage has no `x-content/*` type. PCManFM still asks, as a
+        // "Removable Disk" with only "Open in File Manager"; so do we, with
+        // nothing to remember the answer by.
+        let content_type = types.into_iter().next();
         let config = app.settings().config();
-        if let Some(choice) = autorun::choice(&config, &content_type)
+        if let Some(choice) = content_type
+            .as_deref()
+            .and_then(|content_type| autorun::choice(&config, content_type))
             && choice.remembered
         {
             perform(&app, &choice.app, &root);
             return;
         }
         // Unix software is never remembered: it must ask every time (D15).
-        let may_remember = content_type != "x-content/unix-software";
+        let may_remember = content_type
+            .as_deref()
+            .is_some_and(|content_type| content_type != "x-content/unix-software");
         let parent = app.active_window().map(|w| w.widget().clone().upcast());
-        let apps = autorun::applications(&content_type);
+        let apps = content_type
+            .as_deref()
+            .map(autorun::applications)
+            .unwrap_or_default();
+        let content_type = content_type.unwrap_or_default();
         let app_for_choice = app.clone();
         let content = content_type.clone();
         dialogs::autorun::show(
             parent.as_ref(),
             &entry.name,
-            &content_type,
+            (!content_type.is_empty()).then_some(content_type.as_str()),
             apps,
             may_remember,
             move |choice| {
