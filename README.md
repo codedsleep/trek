@@ -2,12 +2,13 @@
 
 **Elevator pitch:** A graphical file manager for Linux, in Rust and GTK 4, driven from the keyboard with vim motions — parent folder, files and preview side by side, `h` `j` `k` `l` to move, `y` `x` `p` to yank, cut and paste, `z` to fuzzy-find — while the mouse, drag and drop, menus, trash can, volumes and remote places all still work.
 
-![trek: parent folder, files and a preview of the file under the cursor](assets/screenshot.png)
+![trek: parent folder, files and a syntax-highlighted, line-numbered preview of the file under the cursor](assets/screenshot.png)
 
 ## Features
 
 - **Vim motions.** 117 bindings — `h` `j` `k` `l`, `gg` `G`, `Ctrl+U` `Ctrl+D`, `v` for visual mode, `y` `x` `p` to yank, cut and paste, `/` `n` `N` to find, and `g`, `m`, `c` and `,` to start a sequence — each with a description; `~` or `F1` lists them, and a started sequence lists its continuations at the bottom of the window.
-- **Three columns.** Parent folder, files and a preview that lists a folder, shows the start of a text file with line numbers and bat's syntax highlighting, draws an image, and gives anything else a card with its type, size, date and permissions.
+- **Three columns.** Parent folder, files and a preview that lists a folder, shows the start of a text file, draws an image, and gives anything else a card with its type, size, date and permissions.
+- **Code in the preview.** Text files are shown with line numbers and syntax highlighting, as bat shows them — bat's own grammars (Rust, TypeScript, TOML, Dockerfile, shell scripts by their `#!` line, and the rest) in the Nord theme, or a light theme on a light background.
 - **Fuzzy finder.** `z` lists everything below the folder and matches as you type with fzf's query syntax, on all cores, honouring `.gitignore`. No fzf needed.
 - **Fast folders.** A folder is listed on a thread of its own, read once, and handed between columns as you move; a tab keeps the last dozen folders it showed, still watched for changes.
 - **Drives and media.** A USB stick is mounted when you plug it in, as in PCManFM, and asked about with the same "Removable medium is inserted" dialog. Its name appears as a button in the toolbar, lit until you look; `g m` lists every drive with its mount point — `Enter` opens one, `e` ejects it — and the status line says when something is connected, mounted, unmounted or safe to unplug.
