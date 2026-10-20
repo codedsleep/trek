@@ -21,8 +21,8 @@ act create-file; settle 0.5; vin key Return; settle 0.8
 check "Create New Empty File with the default name" test -f "$W/New"
 act create-file; settle 0.5; vin key Return; settle 0.8
 check "a taken name gets a unique one, nothing is overwritten" test -f "$W/New (copy)"
-act create-folder; settle 0.5; vin type "a/b"; vin key Return; settle 0.5; shot create-invalid
-check "an invalid name keeps the input line open" has "$(state)" 'input="New folder:":"a/b"'
+act create-folder; settle 0.5; vin type "a//b"; vin key Return; settle 0.5; shot create-invalid
+check "an invalid path keeps the input line open" has "$(state)" 'input="New folder:":"a//b"'
 vin key Escape; settle 0.4
 check "and creates nothing" test ! -e "$W/a"
 

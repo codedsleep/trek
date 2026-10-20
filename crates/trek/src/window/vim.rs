@@ -328,8 +328,9 @@ impl MainWindow {
         );
     }
 
-    /// `a`: a new file, or a new folder when the name ends with a slash.
-    /// The menu's Create New items ask the same way with the kind decided.
+    /// `a`: a new file, or a new folder when the name ends with a slash;
+    /// a name with slashes in it creates the folders before the last part
+    /// (`test/.planning/`). The menu's Create New items ask the same way with the kind decided.
     pub(super) fn ask_create(&self, folder: Option<bool>) {
         let Some(tab) = self.active_tab() else { return };
         let this = self.downgrade();
@@ -349,10 +350,13 @@ impl MainWindow {
                     let (Some(this), Some(tab)) = (this.upgrade(), tab.upgrade()) else {
                         return None;
                     };
-                    let (name, as_folder) = match (folder, text.strip_suffix('/')) {
-                        (Some(folder), _) => (text, folder),
-                        (None, Some(name)) => (name, true),
-                        (None, None) => (text, false),
+                    // A path makes the folders it names (`a/b/c`), and a
+                    // trailing slash asks for a folder, as `mkdir -p` would.
+                    let trimmed = text.trim_end_matches('/');
+                    let (name, as_folder) = match folder {
+                        Some(true) => (trimmed, true),
+                        Some(false) => (text, false),
+                        None => (trimmed, trimmed.len() != text.len()),
                     };
                     this.create_named(&tab, name, as_folder)
                 }),

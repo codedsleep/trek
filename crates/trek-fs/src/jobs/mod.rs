@@ -66,24 +66,49 @@ pub fn rename(file: &gio::File, name: &str, policy: &Policy) -> Result<gio::File
     Ok(file.set_display_name(name, None::<&gio::Cancellable>)?)
 }
 /// Create a unique folder, retrying collisions without overwriting any entry.
+/// `path` may name nested folders (`a/b/c`): the ones before the last are
+/// made as needed and existing ones reused, like `mkdir -p`.
 pub fn create_folder(
     parent: &gio::File,
-    name: &str,
+    path: &str,
     policy: &Policy,
 ) -> Result<gio::File, JobError> {
-    create(parent, name, policy, true)
+    create(parent, path, policy, true)
 }
-/// Create a unique empty file using exclusive GIO creation.
-pub fn create_file(parent: &gio::File, name: &str, policy: &Policy) -> Result<gio::File, JobError> {
-    create(parent, name, policy, false)
+/// Create a unique empty file using exclusive GIO creation; folders named
+/// before the last part of `path` are made as for [`create_folder`].
+pub fn create_file(parent: &gio::File, path: &str, policy: &Policy) -> Result<gio::File, JobError> {
+    create(parent, path, policy, false)
 }
 fn create(
     parent: &gio::File,
-    name: &str,
+    path: &str,
     policy: &Policy,
     directory: bool,
 ) -> Result<gio::File, JobError> {
-    trek_core::naming::validate(name)?;
+    let parts = trek_core::naming::components(path)?;
+    let (name, folders) = parts.split_last().ok_or(JobError::Invalid)?;
+    let mut parent = parent.clone();
+    for folder in folders {
+        let next = parent.child(folder);
+        crate::guard::check(&next, policy)?;
+        match next.make_directory(None::<&gio::Cancellable>) {
+            Ok(()) => {}
+            Err(e) if e.matches(gio::IOErrorEnum::Exists) => {
+                let kind =
+                    next.query_file_type(gio::FileQueryInfoFlags::NONE, None::<&gio::Cancellable>);
+                if kind != gio::FileType::Directory {
+                    return Err(glib::Error::new(
+                        gio::IOErrorEnum::NotDirectory,
+                        &format!("\"{folder}\" already exists and is not a folder."),
+                    )
+                    .into());
+                }
+            }
+            Err(e) => return Err(e.into()),
+        }
+        parent = next;
+    }
     loop {
         let unique = trek_core::naming::unique_name(name, |n| {
             parent.child(n).query_exists(None::<&gio::Cancellable>)

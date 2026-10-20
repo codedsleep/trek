@@ -135,10 +135,20 @@ check "a creates a file" test -f "$V/made.txt"
 check "and puts the cursor on it" cur made.txt
 vin type "a"; settle 0.3; vin type "newdir/"; vin key Return; settle 0.8
 check "a name ending in a slash makes a folder" test -d "$V/newdir"
-vin type "a"; settle 0.3; vin type "a/b"; vin key Return; settle 0.5
-check "an invalid name keeps the line open" has "$(state)" 'input="Create '
+vin type "a"; settle 0.3; vin type "a//b"; vin key Return; settle 0.5
+check "an invalid path keeps the line open" has "$(state)" 'input="Create '
 vin key Escape; settle 0.3
 check "and creates nothing" test ! -e "$V/a"
+vin type "a"; settle 0.3; vin type "deep/.planning/"; vin key Return; settle 1
+check "a path makes the folders it names" test -d "$V/deep/.planning"
+check "and shows the new folder with the cursor on it" has "$(state)" "location=file://$V/deep .* cursor=\".planning\" "
+check "showing hidden files for a dot name" has "$(state)" 'notice="Showing hidden files'
+vin key h; settle 0.6
+check "h goes back to where it started" has "$(state)" "location=file://$V .* cursor=\"deep\" "
+# Later checks click on fixed rows; take the folder away again.
+rm -rf "$V/deep"; settle 0.6
+vin type "."; settle 0.4
+check ". hides them again" has "$(state)" ' hidden=[1-9]'
 vin type "/"; vin type "made"; vin key Return; settle 0.3
 vin type "r"; settle 0.4
 check "r opens the line with the name" has "$(state)" 'input="Rename:":"made.txt"'

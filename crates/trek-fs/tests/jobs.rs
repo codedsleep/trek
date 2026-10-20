@@ -204,6 +204,35 @@ fn setattrs_count_and_single_item_operations() {
     assert!(create_folder(&parent, "newdir", &p).is_ok());
 }
 #[test]
+fn create_makes_the_folders_a_path_names() {
+    use gio::prelude::*;
+    let t = temp();
+    let p = policy(t.path());
+    let parent = gio::File::for_path(t.path());
+    let made = create_folder(&parent, "test/.planning", &p).unwrap();
+    assert_eq!(made.path().unwrap(), t.path().join("test/.planning"));
+    assert!(t.path().join("test/.planning").is_dir());
+    // Existing folders on the way are reused; the last part stays unique.
+    let file = create_file(&parent, "test/.planning/notes.md", &p).unwrap();
+    assert_eq!(
+        file.path().unwrap(),
+        t.path().join("test/.planning/notes.md")
+    );
+    let again = create_folder(&parent, "test/.planning", &p).unwrap();
+    assert_eq!(
+        again.path().unwrap(),
+        t.path().join("test/.planning (copy)")
+    );
+    // A file in the way is an error, not overwritten.
+    fs::write(t.path().join("plain"), "keep").unwrap();
+    assert!(create_folder(&parent, "plain/inner", &p).is_err());
+    assert_eq!(fs::read_to_string(t.path().join("plain")).unwrap(), "keep");
+    for bad in ["a//b", "/abs", "a/../b", "a/"] {
+        assert!(create_folder(&parent, bad, &p).is_err(), "{bad}");
+    }
+    assert!(!t.path().join("a").exists());
+}
+#[test]
 fn a_folder_may_replace_a_file_and_keeps_its_source() {
     let t = temp();
     let src = t.path().join("src");

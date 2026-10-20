@@ -11,6 +11,16 @@ pub fn validate(name: &str) -> Result<(), InvalidName> {
         Ok(())
     }
 }
+/// Split a relative path typed into the create prompt (`a/b/c`) into its
+/// names; each one must pass [`validate`], so empty parts (a leading `/` or
+/// `a//b`), `.` and `..` are refused.
+pub fn components(path: &str) -> Result<Vec<&str>, InvalidName> {
+    let parts: Vec<&str> = path.split('/').collect();
+    for part in &parts {
+        validate(part)?;
+    }
+    Ok(parts)
+}
 /// Split extension, treating common compressed tar extensions as one suffix.
 pub fn split_extension(name: &str) -> (&str, &str) {
     for ext in [".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst"] {
@@ -67,6 +77,11 @@ mod tests {
             assert!(validate(name).is_err());
         }
         assert!(validate("line\nbreak").is_ok());
+        assert_eq!(components("test/.planning").unwrap(), ["test", ".planning"]);
+        assert_eq!(components("plain").unwrap(), ["plain"]);
+        for path in ["", "/abs", "a//b", "a/", "a/../b", "./a", "a/\0"] {
+            assert!(components(path).is_err(), "{path:?}");
+        }
         assert_eq!(
             unique_name("a.txt", |s| ["a.txt", "a (copy).txt"].contains(&s)),
             "a (copy 2).txt"

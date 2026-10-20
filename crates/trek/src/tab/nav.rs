@@ -24,23 +24,30 @@ impl TabPage {
     /// of a file with the cursor on the file.
     pub fn jump_to(&self, path: &std::path::Path, enter: bool) {
         let file = gio::File::for_path(path);
-        let target = if enter {
-            Some(file.clone())
+        if enter {
+            if let Some(folder) = location_from_uri(&file.uri())
+                && folder.to_uri() != self.0.location.borrow().to_uri()
+            {
+                self.navigate(folder);
+            }
         } else {
-            file.parent()
-        };
-        let Some(folder) = target.and_then(|folder| location_from_uri(&folder.uri())) else {
+            self.reveal(&file);
+        }
+    }
+
+    /// Shows the folder that holds `file`, with the cursor on it once it is
+    /// listed; used after the finder and after creating a nested path.
+    pub fn reveal(&self, file: &gio::File) {
+        let Some(folder) = file.parent().and_then(|f| location_from_uri(&f.uri())) else {
             return;
         };
         if folder.to_uri() != self.0.location.borrow().to_uri() {
             self.navigate(folder);
-        } else if !enter {
-            // Found in the folder shown, where the `f` filter may hide it.
+        } else {
+            // In the folder shown, where the `f` filter may hide it.
             self.set_needle(None);
         }
-        if !enter {
-            self.select_when_listed(&file.uri());
-        }
+        self.select_when_listed(&file.uri());
     }
 
     /// Reads the current folder again from disk, keeping scroll position

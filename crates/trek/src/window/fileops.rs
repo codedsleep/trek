@@ -275,55 +275,64 @@ impl MainWindow {
         );
     }
 
-    /// Creates a folder or an empty file in the tab's folder; the backend
-    /// picks a unique name if this one is taken (§8.10). Returns what is
-    /// wrong with the name, if anything; a failure to create is reported
-    /// once it is known.
+    /// Creates a folder or an empty file in the tab's folder; `name` may be
+    /// a relative path whose missing folders are made on the way. The
+    /// backend picks a unique name for the last part if it is taken
+    /// (§8.10), and the tab then shows the new item's folder with the cursor
+    /// on it. Returns what is wrong with the name, if anything; a failure to
+    /// create is reported once it is known.
     pub(super) fn create_named(&self, tab: &TabPage, name: &str, folder: bool) -> Option<String> {
+        if naming::components(name).is_err() {
+            return Some(if name.contains('/') {
+                "Each part of the path needs a name, and cannot be \".\" or \"..\".".into()
+            } else {
+                crate::dialogs::error::job(&jobs::JobError::Name(naming::InvalidName))
+            });
+        }
         let parent_uri = tab.location().to_uri().to_owned();
         let this = self.clone();
         let tab = tab.downgrade();
-        {
-            {
-                if naming::validate(name).is_err() {
-                    return Some(crate::dialogs::error::job(&jobs::JobError::Name(
-                        naming::InvalidName,
-                    )));
+        let name = name.to_owned();
+        glib::spawn_future_local(async move {
+            let result = gio::spawn_blocking(move || {
+                let parent = gio::File::for_uri(&parent_uri);
+                let policy = Policy::from_environment();
+                if folder {
+                    jobs::create_folder(&parent, &name, &policy)
+                } else {
+                    jobs::create_file(&parent, &name, &policy)
                 }
-                let name = name.to_owned();
-                glib::spawn_future_local(async move {
-                    let result = gio::spawn_blocking(move || {
-                        let parent = gio::File::for_uri(&parent_uri);
-                        let policy = Policy::from_environment();
-                        if folder {
-                            jobs::create_folder(&parent, &name, &policy)
-                        } else {
-                            jobs::create_file(&parent, &name, &policy)
-                        }
-                        .map(|file| file.uri().to_string())
-                    })
-                    .await;
-                    match result {
-                        Ok(Ok(created)) => {
-                            if let Some(tab) = tab.upgrade() {
-                                tab.select_when_listed(&created);
-                            }
-                        }
-                        Ok(Err(e)) => base::alert(
-                            Some(&this.parent()),
-                            if folder {
-                                "The folder could not be created"
-                            } else {
-                                "The file could not be created"
-                            },
-                            &crate::dialogs::error::job(&e),
-                        ),
-                        Err(_) => log::warn!("create worker stopped unexpectedly"),
+                .map(|file| file.uri().to_string())
+            })
+            .await;
+            match result {
+                Ok(Ok(created)) => {
+                    let Some(tab) = tab.upgrade() else { return };
+                    let file = gio::File::for_uri(&created);
+                    // A dot name (`.planning`) would be revealed into a
+                    // view that hides it; show hidden files as `.` would.
+                    let name = file.basename().map(|n| n.to_string_lossy().into_owned());
+                    if let Some(name) = name.filter(|n| n.starts_with('.'))
+                        && !tab.model().show_hidden()
+                    {
+                        tab.set_show_hidden(true);
+                        this.notice(&format!("Showing hidden files to show \"{name}\""));
                     }
-                });
-                None
+                    tab.reveal(&file);
+                }
+                Ok(Err(e)) => base::alert(
+                    Some(&this.parent()),
+                    if folder {
+                        "The folder could not be created"
+                    } else {
+                        "The file could not be created"
+                    },
+                    &crate::dialogs::error::job(&e),
+                ),
+                Err(_) => log::warn!("create worker stopped unexpectedly"),
             }
-        }
+        });
+        None
     }
 
     // ---- copy, move, link ----

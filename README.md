@@ -67,7 +67,7 @@ scripts/install.sh --uninstall
 | `Space`, `v` `V`, `Ctrl+A` `Ctrl+R`, `Esc`             | toggle, visual mode, select all, invert, clear                       |
 | `o` `Enter`, `O` `Shift+Enter`                         | open; open with                                                      |
 | `y` `x` `p` `P`, `Y` `X`, `-`                          | yank, cut, paste, paste over; unyank; link                           |
-| `d` `D`, `a`, `r`                                      | trash, delete; create (end with `/` for a folder); rename            |
+| `d` `D`, `a`, `r`                                      | trash, delete; create (`/` at the end: folder; `a/b/` nests); rename |
 | `/` `?` `n` `N`, `f`                                   | find, next, previous; filter                                         |
 | `z`                                                    | fuzzy finder over everything below the folder                        |
 | `.`, `m…`, `,…`                                        | hidden files; linemode; sort                                         |
