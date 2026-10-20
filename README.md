@@ -28,7 +28,7 @@ Downloads the latest release, verifies its checksum and installs the binary, a l
 ```sh
 ... | sh -s -- --set-default        # also open folders with trek and answer "Show in folder"
 ... | sh -s -- --prefix /usr/local  # install somewhere else
-... | sh -s -- --version v1.2.0     # pin a release
+... | sh -s -- --version v1.2.1     # pin a release
 ... | sh -s -- --uninstall          # remove it again
 ```
 

@@ -42,7 +42,7 @@ body:
     attributes:
       label: trek version
       description: The release tag you installed, or the commit SHA if built from source.
-      placeholder: "v1.2.0"
+      placeholder: "v1.2.1"
     validations:
       required: true
 
