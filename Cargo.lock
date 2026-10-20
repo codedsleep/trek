@@ -1219,7 +1219,7 @@ checksum = "06bdbd8cfc056b8d2e2e85f29b56a3bdbecb527cef81eb39e3e7b98af4652770"
 
 [[package]]
 name = "trek"
-version = "1.2.1"
+version = "1.2.2"
 dependencies = [
  "gio",
  "glib",
@@ -1233,7 +1233,7 @@ dependencies = [
 
 [[package]]
 name = "trek-core"
-version = "1.2.1"
+version = "1.2.2"
 dependencies = [
  "log",
  "syntect",
@@ -1244,7 +1244,7 @@ dependencies = [
 
 [[package]]
 name = "trek-fs"
-version = "1.2.1"
+version = "1.2.2"
 dependencies = [
  "async-channel",
  "gdk-pixbuf",
