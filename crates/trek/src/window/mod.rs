@@ -167,7 +167,7 @@ impl MainWindow {
             }
         });
         toolbar.set_path_bar(path_bar.widget());
-        let devices = Devices::new({
+        let devices = Devices::new(app.settings().clone(), {
             let slot = slot.clone();
             move |request| {
                 let window = slot.borrow().as_ref().and_then(WeakWindow::upgrade);

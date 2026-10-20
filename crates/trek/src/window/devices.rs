@@ -1,15 +1,23 @@
 //! The devices button in the toolbar: removable media, disk images and
 //! other mounts, which PCManFM lists in its side pane. The side pane is
 //! hidden by default here, so this button is where a plugged-in drive
-//! shows up. It is visible only while there is a device, and it stands
-//! out after a medium was mounted until its list is opened.
+//! shows up, with its name and free space. It is visible only while there
+//! is a device, and it stands out after a medium was mounted until its
+//! list is opened.
 //!
 //! In the list: Enter or a click opens the device (mounting it first),
 //! `e` or the button at the end of a row ejects or unmounts it.
 
-use crate::sidepane::places::{Request, Target};
-use gtk::{gio, pango, prelude::*};
-use std::{cell::RefCell, rc::Rc};
+use crate::{
+    settings::Settings,
+    sidepane::places::{Request, Target},
+};
+use gtk::{gio, glib, pango, prelude::*};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
+use trek_core::format;
 use trek_fs::volumes::Entry;
 
 struct Inner {
@@ -17,7 +25,28 @@ struct Inner {
     name: gtk::Label,
     list: gtk::ListBox,
     entries: RefCell<Vec<Entry>>,
+    /// Each row's second line, in the order of `entries`.
+    states: RefCell<Vec<gtk::Label>>,
+    /// Bumped by every `set`, so a late free-space answer for an older
+    /// list is dropped.
+    generation: Cell<u64>,
+    settings: Settings,
     emit: Box<dyn Fn(Request)>,
+}
+
+/// Free and total bytes of a mounted entry's filesystem.
+async fn space(root: &str) -> Option<(u64, Option<u64>)> {
+    let info = gio::File::for_uri(root)
+        .query_filesystem_info_future("filesystem::free,filesystem::size", glib::Priority::LOW)
+        .await
+        .ok()?;
+    let free = info
+        .has_attribute("filesystem::free")
+        .then(|| info.attribute_uint64("filesystem::free"))?;
+    let size = info
+        .has_attribute("filesystem::size")
+        .then(|| info.attribute_uint64("filesystem::size"));
+    Some((free, size))
 }
 
 #[derive(Clone)]
@@ -32,6 +61,23 @@ pub fn place(entry: &Entry) -> Option<String> {
     )
 }
 
+/// The button's tooltip for a single device, with its space once known.
+fn tooltip(entry: &Entry, space: Option<&str>) -> String {
+    let mut lines = vec![entry.name.clone()];
+    match place(entry) {
+        Some(place) if entry.mounted => {
+            lines.extend(space.map(str::to_owned));
+            lines.push(format!("Mounted at {place}"));
+            lines.push("Click or g m to open or eject it".to_owned());
+        }
+        _ => {
+            lines.push("Not mounted".to_owned());
+            lines.push("Click or g m to mount and open it".to_owned());
+        }
+    }
+    lines.join("\n")
+}
+
 /// Ejects removable media and unmounts anything else.
 fn put_away(entry: &Entry) -> Request {
     if entry.can_eject {
@@ -42,11 +88,11 @@ fn put_away(entry: &Entry) -> Request {
 }
 
 impl Devices {
-    pub fn new(emit: impl Fn(Request) + 'static) -> Self {
+    pub fn new(settings: Settings, emit: impl Fn(Request) + 'static) -> Self {
         let icon = gtk::Image::from_icon_name("drive-removable-media-symbolic");
         let name = gtk::Label::new(None);
         name.set_ellipsize(pango::EllipsizeMode::End);
-        name.set_max_width_chars(20);
+        name.set_max_width_chars(32);
         let face = gtk::Box::new(gtk::Orientation::Horizontal, 6);
         face.append(&icon);
         face.append(&name);
@@ -80,6 +126,9 @@ impl Devices {
             name,
             list,
             entries: RefCell::default(),
+            states: RefCell::default(),
+            generation: Cell::new(0),
+            settings,
             emit: Box::new(emit),
         }));
         this.connect();
@@ -124,6 +173,8 @@ impl Devices {
             popover.connect_show(move |_| {
                 let Some(inner) = weak.upgrade() else { return };
                 inner.button.remove_css_class("attention");
+                // Files may have been added since the list was built.
+                Devices(inner.clone()).measure();
                 let row = inner
                     .list
                     .selected_row()
@@ -144,20 +195,76 @@ impl Devices {
     pub fn set(&self, entries: Vec<Entry>) {
         let inner = &self.0;
         let entries: Vec<Entry> = entries.into_iter().filter(|e| !e.internal).collect();
+        inner.generation.set(inner.generation.get() + 1);
         inner.list.remove_all();
+        let mut states = Vec::with_capacity(entries.len());
         for entry in &entries {
-            inner.list.append(&self.row(entry));
+            let (row, state) = self.row(entry);
+            inner.list.append(&row);
+            states.push(state);
         }
-        inner.name.set_text(&match entries.as_slice() {
-            [one] => one.name.clone(),
-            many => format!("{} devices", many.len()),
-        });
+        inner.states.replace(states);
+        match entries.as_slice() {
+            [one] => {
+                inner.name.set_text(&one.name);
+                inner.button.set_tooltip_text(Some(&tooltip(one, None)));
+            }
+            many => {
+                inner.name.set_text(&format!("{} devices", many.len()));
+                inner
+                    .button
+                    .set_tooltip_text(Some("Devices — click or g m to open or eject"));
+            }
+        }
         inner.button.set_visible(!entries.is_empty());
         if entries.is_empty() {
             inner.button.popdown();
             inner.button.remove_css_class("attention");
         }
         inner.entries.replace(entries);
+        self.measure();
+    }
+
+    /// Looks up the free space of every mounted entry and adds it to its
+    /// row, and to the button when it is the only device.
+    fn measure(&self) {
+        let inner = &self.0;
+        let generation = inner.generation.get();
+        let entries = inner.entries.borrow().clone();
+        let only = entries.len() == 1;
+        for (index, entry) in entries.into_iter().enumerate() {
+            let (true, Some(root), Some(place)) =
+                (entry.mounted, entry.root.clone(), place(&entry))
+            else {
+                continue;
+            };
+            let weak = Rc::downgrade(&self.0);
+            glib::spawn_future_local(async move {
+                let space = space(&root).await;
+                let Some(inner) = weak.upgrade() else { return };
+                let Some((free, size)) = space else { return };
+                if inner.generation.get() != generation {
+                    return;
+                }
+                let si = inner.settings.si_unit();
+                let free_text = format!("{} free", format::size(free, si));
+                if let Some(state) = inner.states.borrow().get(index) {
+                    state.set_text(&format!("{free_text} · {place}"));
+                }
+                if only {
+                    inner
+                        .name
+                        .set_text(&format!("{} · {free_text}", entry.name));
+                    let detail = match size {
+                        Some(size) => format!("{free_text} of {}", format::size(size, si)),
+                        None => free_text,
+                    };
+                    inner
+                        .button
+                        .set_tooltip_text(Some(&tooltip(&entry, Some(&detail))));
+                }
+            });
+        }
     }
 
     /// Makes the button stand out until its list is opened.
@@ -175,7 +282,7 @@ impl Devices {
         }
     }
 
-    fn row(&self, entry: &Entry) -> gtk::Box {
+    fn row(&self, entry: &Entry) -> (gtk::Box, gtk::Label) {
         let image = gtk::Image::new();
         image.set_pixel_size(24);
         match entry
@@ -220,6 +327,6 @@ impl Devices {
             });
             row.append(&eject);
         }
-        row
+        (row, state)
     }
 }
