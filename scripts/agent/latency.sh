@@ -79,7 +79,7 @@ launch() {
             rm -rf "$settings"
             mkdir -p "$settings/pcmanfm/default"
             {
-                printf '[volume]\nmount_on_startup=0\nmount_removable=0\nautorun=0\n'
+                printf '[volume]\nmount_on_startup=0\nmount_removable=0\n'
                 [[ $app != pcmanfm-list ]] || printf '[ui]\nview_mode=list\n'
             } >"$settings/pcmanfm/default/pcmanfm.conf"
             printf 'T0 %s %s\n' "$(date -u +%T.%6N)" "$1" >"$log"

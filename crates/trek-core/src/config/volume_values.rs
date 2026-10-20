@@ -36,20 +36,6 @@ impl Config {
                     warnings,
                 )
             }
-            "autorun" => {
-                self.autorun = fallback(
-                    match value {
-                        "0" => Some(false),
-                        "1" => Some(true),
-                        _ => None,
-                    },
-                    || Self::default().autorun,
-                    "volume",
-                    key,
-                    value,
-                    warnings,
-                )
-            }
             _ => return false,
         }
         true

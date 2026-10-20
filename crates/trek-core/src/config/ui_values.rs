@@ -45,20 +45,6 @@ impl Config {
                     warnings,
                 )
             }
-            "media_in_new_tab" => {
-                self.media_in_new_tab = fallback(
-                    match value {
-                        "0" => Some(false),
-                        "1" => Some(true),
-                        _ => None,
-                    },
-                    || Self::default().media_in_new_tab,
-                    "ui",
-                    key,
-                    value,
-                    warnings,
-                )
-            }
             "desktop_folder_new_win" => {
                 self.desktop_folder_new_win = fallback(
                     match value {

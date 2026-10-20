@@ -122,35 +122,6 @@ impl FromStr for Columns {
         Ok(Self(out))
     }
 }
-/// Autorun choice; software media cannot bypass confirmation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AutorunChoice {
-    /// Application desktop id.
-    pub app: String,
-    /// Remember without asking.
-    pub remembered: bool,
-}
-impl AutorunChoice {
-    /// Decode an upstream choice, clearing software-media trust.
-    pub fn parse(content_type: &str, value: &str) -> Self {
-        Self {
-            app: value.trim_start_matches('*').into(),
-            remembered: value.starts_with('*') && content_type != "x-content/unix-software",
-        }
-    }
-    /// Encode a choice, enforcing the software-media rule.
-    pub fn encode(&self, content_type: &str) -> String {
-        format!(
-            "{}{}",
-            if self.remembered && content_type != "x-content/unix-software" {
-                "*"
-            } else {
-                ""
-            },
-            self.app
-        )
-    }
-}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,13 +147,5 @@ mod tests {
         }
         assert!("name:0;".parse::<Columns>().is_err());
         assert!("???".parse::<Toolbar>().is_err());
-    }
-    #[test]
-    fn autorun() {
-        let v = AutorunChoice::parse("x-content/image-dcf", "*a.desktop");
-        assert!(v.remembered);
-        assert_eq!(v.encode("x-content/image-dcf"), "*a.desktop");
-        assert!(!AutorunChoice::parse("x-content/unix-software", "*a.desktop").remembered);
-        assert_eq!(v.encode("x-content/unix-software"), "a.desktop");
     }
 }

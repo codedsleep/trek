@@ -6,7 +6,6 @@ use crate::{
 use gtk::{gio, glib, prelude::*};
 use std::{
     cell::{Cell, OnceCell, RefCell},
-    collections::HashSet,
     ffi::OsString,
     rc::Rc,
 };
@@ -27,8 +26,6 @@ struct Inner {
     volumes: volumes::Model,
     /// The whole volume inventory as last seen, to tell what changed.
     inventory: RefCell<Vec<volumes::Entry>>,
-    /// Volumes this process mounted because they were inserted.
-    automounted: RefCell<HashSet<String>>,
     /// Bookmarks or volumes changed: side panes rebuild.
     places_changed: Listeners,
     /// The thumbnail workers and texture cache; `None` if they cannot start.
@@ -80,7 +77,6 @@ impl App {
             bookmarks_menu: gio::Menu::new(),
             inventory: RefCell::new(volumes.inventory()),
             volumes,
-            automounted: RefCell::default(),
             places_changed: Listeners::default(),
             thumbs: crate::view::thumbs::Thumbs::new(),
             dir_settings,
@@ -203,14 +199,6 @@ impl App {
     /// Emitted when bookmarks or volumes changed.
     pub fn places_changed(&self) -> &Listeners {
         &self.0.places_changed
-    }
-
-    pub fn note_automount(&self, id: &str) {
-        self.0.automounted.borrow_mut().insert(id.to_owned());
-    }
-
-    pub fn take_automount(&self, id: &str) -> bool {
-        self.0.automounted.borrow_mut().remove(id)
     }
 
     /// Tells every window what happened to a drive or medium.

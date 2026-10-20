@@ -11,7 +11,7 @@
 - **Code in the preview.** Text files are shown with line numbers and syntax highlighting, as bat shows them — bat's own grammars (Rust, TypeScript, TOML, Dockerfile, shell scripts by their `#!` line, and the rest) in the Nord theme, or a light theme on a light background.
 - **Fuzzy finder.** `z` lists everything below the folder and matches as you type with fzf's query syntax, on all cores, honouring `.gitignore`. No fzf needed.
 - **Fast folders.** A folder is listed on a thread of its own, read once, and handed between columns as you move; a tab keeps the last dozen folders it showed, still watched for changes.
-- **Drives and media.** A USB stick is mounted when you plug it in, as in PCManFM, and asked about with the same "Removable medium is inserted" dialog. Its name appears as a button in the toolbar, lit until you look; `g m` lists every drive with its mount point — `Enter` opens one, `e` ejects it — and the status line says when something is connected, mounted, unmounted or safe to unplug.
+- **Drives and media.** A USB stick is mounted when you plug it in, with no dialog and no new window. Its name appears as a button in the toolbar, lit until you look. Click it or press `g m` to list every drive with its mount point — `Enter` opens one, `e` ejects it — and the status line says when something is connected, mounted, unmounted or safe to unplug.
 - **Text files in your editor.** `$VISUAL`, `$EDITOR` or nvim, in a terminal; default applications and Open With for the rest.
 - **Everything PCManFM does.** Tabs, dual pane, a side pane with places or a directory tree, five views, copy/move/trash with a progress window and conflict questions, volumes, Connect to Server through GVFS, Properties, Preferences, thumbnails.
 - **Your GTK theme.** Dark, in the colours of the desktop's theme — including GTK 3-only themes, whose palette is carried over onto GTK 4's stylesheet.
@@ -187,7 +187,7 @@ Keys and layout are trek's own, as described above. Everything else that is not 
 3. `--role` accepted with no effect
 4. `admin://` rejected
 5. Launchers and scripts on filesystems with synthetic execute bits are never trusted or offered for execution
-6. Autorun choice cannot be remembered for `x-content/unix-software`
+6. No autorun: an inserted medium is mounted and shown in the toolbar's devices button, and nothing else happens until you open it. The `[autorun]` choices, `autorun` and `media_in_new_tab` keys are ignored
 7. No external thumbnailers
 8. Owns `org.freedesktop.FileManager1`
 9. Recursive delete stops and asks at a mount point
@@ -210,7 +210,7 @@ Keys and layout are trek's own, as described above. Everything else that is not 
 26. Recursive permission changes prepare the tree and visit children before parents; an inaccessible subtree cannot be repaired by granting access recursively
 27. A listing error after an initial batch leaves the partial view in Loading; partial-result error presentation awaits an owner decision
 28. Text files open in the editor (`$VISUAL`, then `$EDITOR`, then `nvim`) in the terminal, whatever application is set for their type; that includes executable scripts, which are no longer offered for execution unless `quick_exec=1`. Pictures written in XML (SVG) keep their applications. An application with `Terminal=true` is started in trek's terminal, not one from GIO's list
-29. Media are automounted whenever GIO's volume monitor marks them for automounting, not only when the drive reports itself removable, so disk images you attach count too. A medium with no recognised content still gets the autorun dialog, as "Removable Disk" with only "Open in File Manager" and nothing to remember
+29. Media are automounted whenever GIO's volume monitor marks them for automounting, not only when the drive reports itself removable, so disk images you attach count too.
 
 ## Development
 

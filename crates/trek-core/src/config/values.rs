@@ -44,17 +44,12 @@ impl Config {
             "volume" => self.apply_volume(key, value, warnings),
             "ui" => self.apply_ui(key, value, warnings),
             "places" => self.apply_places(key, value, warnings),
-            "autorun" => {
-                self.autorun_choices
-                    .insert(key.into(), AutorunChoice::parse(key, value));
-                true
-            }
             _ => false,
         }
     }
     /// Encode all known keys in upstream format.
     pub fn entries(&self) -> Vec<(String, String, String)> {
-        let mut entries = vec![
+        vec![
             entry!(self, "config", single_click, bool),
             entry!(self, "config", use_trash, bool),
             entry!(self, "config", confirm_del, bool),
@@ -74,11 +69,9 @@ impl Config {
             entry!(self, "config", thumbnail_local, bool),
             entry!(self, "volume", mount_on_startup, bool),
             entry!(self, "volume", mount_removable, bool),
-            entry!(self, "volume", autorun, bool),
             entry!(self, "ui", always_show_tabs, bool),
             entry!(self, "ui", hide_close_btn, bool),
             entry!(self, "ui", maximized, bool),
-            entry!(self, "ui", media_in_new_tab, bool),
             entry!(self, "ui", desktop_folder_new_win, bool),
             entry!(self, "ui", change_tab_on_drop, bool),
             entry!(self, "ui", close_on_unmount, bool),
@@ -120,13 +113,7 @@ impl Config {
             entry!(self, "ui", sort, SortSpec),
             entry!(self, "ui", columns, Columns),
             entry!(self, "ui", toolbar, Toolbar),
-        ];
-        entries.extend(
-            self.autorun_choices
-                .iter()
-                .map(|(key, value)| ("autorun".into(), key.clone(), value.encode(key))),
-        );
-        entries
+        ]
     }
 }
 #[cfg(test)]

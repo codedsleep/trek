@@ -2,16 +2,13 @@
 //! notification per key and a debounced save (PROMPT §7.6).
 
 use gtk::glib;
-use std::collections::BTreeMap;
 use std::{
     cell::{Cell, RefCell},
     path::PathBuf,
     rc::Rc,
     time::Duration,
 };
-use trek_core::config::{
-    AutorunChoice, BookmarkOpen, Columns, Config, DropAction, SidePane, Toolbar, ViewMode,
-};
+use trek_core::config::{BookmarkOpen, Columns, Config, DropAction, SidePane, Toolbar, ViewMode};
 use trek_core::sort::SortSpec;
 use trek_fs::settings_store::{SettingsError, Store};
 
@@ -89,11 +86,9 @@ keys! {
     ThumbnailLocal thumbnail_local: bool,
     MountOnStartup mount_on_startup: bool,
     MountRemovable mount_removable: bool,
-    Autorun autorun: bool,
     AlwaysShowTabs always_show_tabs: bool,
     HideCloseBtn hide_close_btn: bool,
     Maximized maximized: bool,
-    MediaInNewTab media_in_new_tab: bool,
     ChangeTabOnDrop change_tab_on_drop: bool,
     CloseOnUnmount close_on_unmount: bool,
     FocusPrevious focus_previous: bool,
@@ -132,7 +127,6 @@ keys! {
     Sort sort: SortSpec,
     Columns columns: Columns,
     Toolbar toolbar: Toolbar,
-    AutorunChoices autorun_choices: BTreeMap<String, AutorunChoice>,
 }
 
 impl Settings {

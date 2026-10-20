@@ -1,6 +1,5 @@
 //! Dialogs and the one place errors become user-facing text.
 
-pub mod autorun;
 pub mod base;
 pub mod conflict;
 pub mod connect;

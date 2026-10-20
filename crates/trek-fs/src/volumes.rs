@@ -1,5 +1,5 @@
 //! Plain volume inventory and GIO change notifications.
-pub mod autorun;
+pub mod automount;
 mod operations;
 use gio::prelude::*;
 pub use operations::*;

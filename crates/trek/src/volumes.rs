@@ -1,6 +1,8 @@
 //! Volumes in the UI (PROMPT §8.17): mount, unmount and eject with their
-//! prompts, automount, autorun, and what happens to tabs when a mount goes.
-//! The inventory and the policies are `fs::volumes`.
+//! prompts, automount, and what happens to tabs when a mount goes. An
+//! inserted medium is only mounted and shown in the toolbar's devices
+//! button; nothing opens by itself. The inventory and the policies are
+//! `fs::volumes`.
 
 use crate::{
     app::App,
@@ -8,11 +10,8 @@ use crate::{
     tab::location_from_uri,
 };
 use gtk::{gio, glib, prelude::*};
-use trek_core::{config::AutorunChoice, location::Location};
-use trek_fs::volumes::{self, Entry, Filters, autorun};
-
-/// The choice stored in `[autorun]` for "Open in File Manager".
-const FILE_MANAGER: &str = "trek";
+use trek_core::location::Location;
+use trek_fs::volumes::{self, Entry, Filters, automount};
 
 /// Places visibility from the settings.
 pub fn filters(app: &App) -> Filters {
@@ -131,14 +130,14 @@ pub fn eject(app: &App, parent: Option<&gtk::Window>, id: &str) {
 /// `mount_on_startup`: mount every volume that wants automounting.
 pub fn startup(app: &App) {
     let inventory = app.volumes().inventory();
-    for id in autorun::automount_plan(&inventory, &app.settings().config(), true) {
+    for id in automount::plan(&inventory, &app.settings().config(), true) {
         mount(app, None, &id, |_| {});
     }
 }
 
 /// Reacts to a change of the inventory: automounts newly inserted media,
-/// offers autorun for what it mounted, tells windows about lost mounts, and
-/// says in the status line what happened to drives that are not fixed disks.
+/// tells windows about lost mounts, and says in the status line what
+/// happened to drives that are not fixed disks.
 pub fn changed(app: &App, before: &[Entry], after: &[Entry]) {
     let config = app.settings().config();
     let old = |id: &str| before.iter().find(|entry| entry.id == id);
@@ -148,7 +147,7 @@ pub fn changed(app: &App, before: &[Entry], after: &[Entry]) {
         .filter(|entry| old(&entry.id).is_none())
         .cloned()
         .collect();
-    let plan = autorun::automount_plan(&inserted, &config, false);
+    let plan = automount::plan(&inserted, &config, false);
     for entry in inserted
         .iter()
         .filter(|entry| !entry.internal && !entry.mounted)
@@ -160,7 +159,6 @@ pub fn changed(app: &App, before: &[Entry], after: &[Entry]) {
         }
     }
     for id in plan {
-        app.note_automount(&id);
         mount(app, None, &id, |_| {});
     }
 
@@ -172,10 +170,6 @@ pub fn changed(app: &App, before: &[Entry], after: &[Entry]) {
                 &format!("“{}” mounted at {place} — g m to open it", entry.name),
                 true,
             );
-        }
-        // Autorun only follows a mount we made for inserted media (§8.17).
-        if newly && app.take_automount(&entry.id) && autorun::prompt_enabled(&config) {
-            offer_autorun(app, entry.clone());
         }
     }
 
@@ -208,97 +202,5 @@ fn announce_unmounted(app: &App, entry: &Entry) {
         if waiting {
             app.volume_event(&format!("“{name}” connected — g m to mount it"), false);
         }
-    });
-}
-
-fn open_in_file_manager(app: &App, root: Location) {
-    // `media_in_new_tab`: a tab in the last window rather than a window.
-    let new_window = !app.settings().media_in_new_tab();
-    app.open_folder(root, new_window);
-}
-
-fn perform(app: &App, choice: &str, root: &Location) {
-    if choice == FILE_MANAGER {
-        open_in_file_manager(app, root.clone());
-        return;
-    }
-    let Some(handler) = gio::AppInfo::all()
-        .into_iter()
-        .find(|candidate| candidate.id().as_deref() == Some(choice))
-    else {
-        open_in_file_manager(app, root.clone());
-        return;
-    };
-    let context = crate::open::launch_context();
-    if let Err(e) = handler.launch_uris(&[root.to_uri()], context.as_ref()) {
-        log::warn!("Autorun: {e}");
-    }
-}
-
-fn offer_autorun(app: &App, entry: Entry) {
-    let (Some(mount), Some(root)) = (
-        app.volumes().mounted(&entry.id),
-        entry.root.as_deref().and_then(location_from_uri),
-    ) else {
-        return;
-    };
-    let app = app.clone();
-    glib::spawn_future_local(async move {
-        let types = autorun::content_types(&mount).await.unwrap_or_default();
-        // Plain storage has no `x-content/*` type. PCManFM still asks, as a
-        // "Removable Disk" with only "Open in File Manager"; so do we, with
-        // nothing to remember the answer by.
-        let content_type = types.into_iter().next();
-        let config = app.settings().config();
-        if let Some(choice) = content_type
-            .as_deref()
-            .and_then(|content_type| autorun::choice(&config, content_type))
-            && choice.remembered
-        {
-            perform(&app, &choice.app, &root);
-            return;
-        }
-        // Unix software is never remembered: it must ask every time (D15).
-        let may_remember = content_type
-            .as_deref()
-            .is_some_and(|content_type| content_type != "x-content/unix-software");
-        let parent = app.active_window().map(|w| w.widget().clone().upcast());
-        let apps = content_type
-            .as_deref()
-            .map(autorun::applications)
-            .unwrap_or_default();
-        let content_type = content_type.unwrap_or_default();
-        let app_for_choice = app.clone();
-        let content = content_type.clone();
-        dialogs::autorun::show(
-            parent.as_ref(),
-            &entry.name,
-            (!content_type.is_empty()).then_some(content_type.as_str()),
-            apps,
-            may_remember,
-            move |choice| {
-                let id = choice
-                    .app
-                    .as_ref()
-                    .and_then(|handler| handler.id())
-                    .map_or_else(|| FILE_MANAGER.to_owned(), |id| id.to_string());
-                if choice.remember {
-                    let mut config = app_for_choice.settings().config();
-                    autorun::remember(
-                        &mut config,
-                        &content,
-                        AutorunChoice {
-                            app: id.clone(),
-                            remembered: true,
-                        },
-                    );
-                    crate::settings::set::autorun_choices(
-                        app_for_choice.settings(),
-                        config.autorun_choices,
-                    );
-                }
-                perform(&app_for_choice, &id, &root);
-            },
-        );
     });
 }

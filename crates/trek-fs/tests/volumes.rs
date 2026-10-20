@@ -1,8 +1,5 @@
-use trek_core::{
-    config::{AutorunChoice, Config},
-    location::Location,
-};
-use trek_fs::volumes::{autorun, *};
+use trek_core::{config::Config, location::Location};
+use trek_fs::volumes::{automount, *};
 fn entry() -> Entry {
     Entry {
         id: "usb".into(),
@@ -19,7 +16,7 @@ fn entry() -> Entry {
     }
 }
 #[test]
-fn filters_automount_and_autorun() {
+fn filters_and_automount() {
     let mut e = entry();
     let mut c = Config::default();
     assert!(visible(&e, Filters::default()));
@@ -30,13 +27,10 @@ fn filters_automount_and_autorun() {
             ..Default::default()
         }
     ));
-    assert_eq!(
-        autorun::automount_plan(&[e.clone()], &c, false),
-        vec!["usb"]
-    );
+    assert_eq!(automount::plan(&[e.clone()], &c, false), vec!["usb"]);
     c.mount_removable = false;
-    assert!(autorun::automount_plan(&[e.clone()], &c, false).is_empty());
-    assert_eq!(autorun::automount_plan(&[e.clone()], &c, true), vec!["usb"]);
+    assert!(automount::plan(&[e.clone()], &c, false).is_empty());
+    assert_eq!(automount::plan(&[e.clone()], &c, true), vec!["usb"]);
     e.internal = true;
     assert!(!visible(&e, Filters::default()));
     assert!(visible(
@@ -46,23 +40,7 @@ fn filters_automount_and_autorun() {
             ..Default::default()
         }
     ));
-    assert!(autorun::automount_plan(&[e], &c, true).is_empty());
-    let choice = AutorunChoice {
-        app: "run.desktop".into(),
-        remembered: true,
-    };
-    autorun::remember(&mut c, "x-content/unix-software", choice.clone());
-    assert!(
-        !autorun::choice(&c, "x-content/unix-software")
-            .unwrap()
-            .remembered
-    );
-    autorun::remember(&mut c, "x-content/image-dcf", choice);
-    assert!(
-        autorun::choice(&c, "x-content/image-dcf")
-            .unwrap()
-            .remembered
-    );
+    assert!(automount::plan(&[e], &c, true).is_empty());
 }
 #[test]
 fn mount_locations_and_busy_error() {
@@ -91,12 +69,12 @@ fn automount_follows_the_backend_hint() {
         ..entry()
     };
     assert_eq!(
-        autorun::automount_plan(std::slice::from_ref(&image), &c, false),
+        automount::plan(std::slice::from_ref(&image), &c, false),
         vec!["usb"]
     );
     let held_back = Entry {
         should_automount: false,
         ..image
     };
-    assert!(autorun::automount_plan(&[held_back], &c, false).is_empty());
+    assert!(automount::plan(&[held_back], &c, false).is_empty());
 }

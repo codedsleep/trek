@@ -8,7 +8,6 @@ mod ui_values;
 mod volume_values;
 use crate::sort::SortSpec;
 pub use codecs::*;
-use std::collections::BTreeMap;
 /// All v1 settings, excluding deferred desktop configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
@@ -50,16 +49,12 @@ pub struct Config {
     pub mount_on_startup: bool,
     /// `volume/mount_removable`.
     pub mount_removable: bool,
-    /// `volume/autorun`.
-    pub autorun: bool,
     /// `ui/always_show_tabs`.
     pub always_show_tabs: bool,
     /// `ui/hide_close_btn`.
     pub hide_close_btn: bool,
     /// `ui/maximized`.
     pub maximized: bool,
-    /// `ui/media_in_new_tab`.
-    pub media_in_new_tab: bool,
     /// `ui/desktop_folder_new_win`.
     pub desktop_folder_new_win: bool,
     /// `ui/change_tab_on_drop`.
@@ -142,8 +137,6 @@ pub struct Config {
     pub columns: Columns,
     /// `ui/toolbar`.
     pub toolbar: Toolbar,
-    /// Media content-type choices.
-    pub autorun_choices: BTreeMap<String, AutorunChoice>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -167,11 +160,9 @@ impl Default for Config {
             thumbnail_local: true,
             mount_on_startup: true,
             mount_removable: true,
-            autorun: true,
             always_show_tabs: false,
             hide_close_btn: false,
             maximized: false,
-            media_in_new_tab: false,
             desktop_folder_new_win: false,
             change_tab_on_drop: true,
             close_on_unmount: true,
@@ -216,7 +207,6 @@ impl Default for Config {
             sort: SortSpec::default(),
             columns: Columns::default(),
             toolbar: Toolbar(Vec::new()),
-            autorun_choices: BTreeMap::new(),
         }
     }
 }

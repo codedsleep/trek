@@ -541,12 +541,6 @@ fn volumes(settings: &Settings, shared: &Shared) -> gtk::Box {
         Settings::mount_removable,
         set::mount_removable,
     );
-    page.check(
-        "_Show available options for removable media when they are inserted",
-        Key::Autorun,
-        Settings::autorun,
-        set::autorun,
-    );
     page.heading("Auto-unmount");
     page.check(
         "Close _tab containing removable medium when it is unmounted",
@@ -554,25 +548,6 @@ fn volumes(settings: &Settings, shared: &Shared) -> gtk::Box {
         Settings::close_on_unmount,
         set::close_on_unmount,
     );
-    page.check(
-        "_Open removable media in a new tab",
-        Key::MediaInNewTab,
-        Settings::media_in_new_tab,
-        set::media_in_new_tab,
-    );
-    page.heading("Remembered choices");
-    let forget = gtk::Button::with_mnemonic("_Forget remembered autorun choices");
-    forget.set_halign(gtk::Align::Start);
-    forget.set_sensitive(!settings.autorun_choices().is_empty());
-    let for_click = settings.clone();
-    forget.connect_clicked(move |_| set::autorun_choices(&for_click, Default::default()));
-    let (weak, for_watch) = (forget.downgrade(), settings.clone());
-    page.watch(Key::AutorunChoices, move || {
-        if let Some(forget) = weak.upgrade() {
-            forget.set_sensitive(!for_watch.autorun_choices().is_empty());
-        }
-    });
-    page.line(&forget);
     page.root
 }
 
