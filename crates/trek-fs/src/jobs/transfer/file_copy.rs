@@ -121,6 +121,9 @@ impl Runner {
             let size = info(&temp, &self.control.cancel)?.size().max(0) as u64;
             let published = self.publish(src, &temp, dest, overwrite)?;
             if published {
+                // The temporary file is now the destination. Never delete its
+                // old name: MTP (gvfs) still resolves it to the moved file.
+                owns_temp = false;
                 self.completed(size);
             }
             Ok(published)

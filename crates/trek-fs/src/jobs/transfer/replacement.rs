@@ -9,6 +9,7 @@ impl Runner {
     ) -> Result<(), JobError> {
         let temp = self.reserve_temp(dest)?;
         temp.delete(Some(&self.control.cancel))?;
+        let mut published = false;
         let result = (|| {
             crate::guard::check(&temp, &self.policy)?;
             temp.make_directory(Some(&self.control.cancel))?;
@@ -17,7 +18,8 @@ impl Runner {
             if self.summary.skipped != skipped {
                 return Ok(());
             }
-            if self.publish(src, &temp, dest, true)? && moving {
+            published = self.publish(src, &temp, dest, true)?;
+            if published && moving {
                 let before = (self.summary.done_files, self.summary.done_bytes);
                 let result = self.delete(src, None);
                 self.summary.done_files = before.0;
@@ -26,7 +28,11 @@ impl Runner {
             }
             Ok(())
         })();
-        self.cleanup_tree(&temp);
+        // A published folder is the destination now; as in `copy_file`, its
+        // old name may still lead to it (MTP), so it is left alone.
+        if !published {
+            self.cleanup_tree(&temp);
+        }
         result
     }
     pub(super) fn replace_mismatch(
