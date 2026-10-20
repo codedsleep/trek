@@ -1,9 +1,9 @@
 //! The devices button in the toolbar: removable media, disk images and
 //! other mounts, which PCManFM lists in its side pane. The side pane is
 //! hidden by default here, so this button is where a plugged-in drive
-//! shows up, with its name and free space. It is visible only while there
-//! is a device, and it stands out after a medium was mounted until its
-//! list is opened.
+//! shows up, by name; its free space is in the list. It is visible only
+//! while there is a device, and it stands out after a medium was mounted
+//! until its list is opened.
 //!
 //! In the list: Enter or a click opens the device (mounting it first),
 //! `e` or the button at the end of a row ejects or unmounts it.
@@ -226,7 +226,7 @@ impl Devices {
     }
 
     /// Looks up the free space of every mounted entry and adds it to its
-    /// row, and to the button when it is the only device.
+    /// row, and to the button's tooltip when it is the only device.
     fn measure(&self) {
         let inner = &self.0;
         let generation = inner.generation.get();
@@ -252,9 +252,6 @@ impl Devices {
                     state.set_text(&format!("{free_text} · {place}"));
                 }
                 if only {
-                    inner
-                        .name
-                        .set_text(&format!("{} · {free_text}", entry.name));
                     let detail = match size {
                         Some(size) => format!("{free_text} of {}", format::size(size, si)),
                         None => free_text,
